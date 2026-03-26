@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import PublicBookingModal from '@/components/public/PublicBookingModal'; 
-import { supabase } from '@/lib/supabaseClient';
+import PublicBookingModal from '@/components/public/PublicBookingModal';
+import api from '@/lib/api';
 import config from '@/config';
 
 const hours = Array.from({ length: 57 }, (_, i) => { const totalMinutes = 8 * 60 + i * 15; const h = Math.floor(totalMinutes / 60).toString().padStart(2, '0'); const m = (totalMinutes % 60).toString().padStart(2, '0'); return `${h}:${m}`; });
@@ -34,17 +34,30 @@ const PublicBookingPage = () => {
         const monthStart = startOfMonth(currentDate);
         const monthEnd = endOfMonth(currentDate);
         try {
-            const [appointmentsRes, servicesRes, schedulesRes, exceptionsRes] = await Promise.all([ supabase.from('appointments').select('appointment_at, duration_at_time_minutes').gte('appointment_at', monthStart.toISOString()).lte('appointment_at', monthEnd.toISOString()).in('status', ['SCHEDULED', 'COMPLETED', 'PAID']), supabase.from('services').select('id, name, duration_min, sale_price').eq('active', true), supabase.from('work_schedules').select('*'), supabase.from('schedule_exceptions').select('*') ]);
-            if (appointmentsRes.error) throw appointmentsRes.error;
-            if (servicesRes.error) throw servicesRes.error;
-            if (schedulesRes.error) throw schedulesRes.error;
-            if (exceptionsRes.error) throw exceptionsRes.error;
-            const appointmentsWithIndex = (appointmentsRes.data || []).map(appointment => { const appointmentDate = parseISO(appointment.appointment_at); const hour = appointmentDate.getHours(); const minute = appointmentDate.getMinutes(); const hourIndex = (hour - 8) * 4 + Math.floor(minute / 15); const duration = appointment.duration_at_time_minutes || 15; const durationInSlots = Math.ceil(duration / 15); return { ...appointment, hourIndex, durationInSlots }; });
+            const [appointmentsData, servicesData, schedulesData, exceptionsData] = await Promise.all([
+                api.getAppointments(monthStart.toISOString(), monthEnd.toISOString()),
+                api.getActiveServices(),
+                api.getWorkSchedules(),
+                api.getScheduleExceptions()
+            ]);
+
+            const appointmentsWithIndex = (appointmentsData || [])
+                .filter(a => ['SCHEDULED', 'COMPLETED', 'PAID'].includes(a.status))
+                .map(appointment => {
+                    const appointmentDate = parseISO(appointment.appointment_at);
+                    const hour = appointmentDate.getHours();
+                    const minute = appointmentDate.getMinutes();
+                    const hourIndex = (hour - 8) * 4 + Math.floor(minute / 15);
+                    const duration = appointment.duration_at_time_minutes || 15;
+                    const durationInSlots = Math.ceil(duration / 15);
+                    return { ...appointment, hourIndex, durationInSlots };
+                });
             setAppointments(appointmentsWithIndex);
-            setServices(servicesRes.data || []);
+            setServices((servicesData || []).map(s => ({ id: s.id, name: s.name, duration_min: s.duration_min, sale_price: s.sale_price })));
+
             const formattedAvailability = { default: { '0': { available: false, ranges: [], breaks: [] }, '1': { available: false, ranges: [], breaks: [] }, '2': { available: false, ranges: [], breaks: [] }, '3': { available: false, ranges: [], breaks: [] }, '4': { available: false, ranges: [], breaks: [] }, '5': { available: false, ranges: [], breaks: [] }, '6': { available: false, ranges: [], breaks: [] }, }, exceptions: {} };
-            schedulesRes.data.forEach(s => { const dayKey = s.day_of_week.toString(); formattedAvailability.default[dayKey].available = true; if (s.is_break) { formattedAvailability.default[dayKey].breaks.push({ start: s.start_time, end: s.end_time }); } else { formattedAvailability.default[dayKey].ranges.push({ start: s.start_time, end: s.end_time }); } });
-            exceptionsRes.data.forEach(e => { const dateKey = e.exception_date; if (!formattedAvailability.exceptions[dateKey]) { formattedAvailability.exceptions[dateKey] = { available: e.available, ranges: [], breaks: [] }; } if (e.available) { if (e.is_break) { formattedAvailability.exceptions[dateKey].breaks.push({ start: e.start_time, end: e.end_time }); } else { formattedAvailability.exceptions[dateKey].ranges.push({ start: e.start_time, end: e.end_time }); } } });
+            (schedulesData || []).forEach(s => { const dayKey = s.day_of_week.toString(); formattedAvailability.default[dayKey].available = true; if (s.is_break) { formattedAvailability.default[dayKey].breaks.push({ start: s.start_time, end: s.end_time }); } else { formattedAvailability.default[dayKey].ranges.push({ start: s.start_time, end: s.end_time }); } });
+            (exceptionsData || []).forEach(e => { const dateKey = e.exception_date; if (!formattedAvailability.exceptions[dateKey]) { formattedAvailability.exceptions[dateKey] = { available: e.available, ranges: [], breaks: [] }; } if (e.available) { if (e.is_break) { formattedAvailability.exceptions[dateKey].breaks.push({ start: e.start_time, end: e.end_time }); } else { formattedAvailability.exceptions[dateKey].ranges.push({ start: e.start_time, end: e.end_time }); } } });
             setAvailability(formattedAvailability);
         } catch (error) {
             console.error("Error cargando datos públicos de la agenda:", error);
@@ -90,7 +103,7 @@ const PublicBookingPage = () => {
                                 <div className="grid min-w-[800px] relative" style={{ gridTemplateColumns: '60px repeat(7, 1fr)', gridTemplateRows: `auto repeat(${hours.length}, 40px)` }}>
                                     <div className="sticky top-0 z-20 bg-card p-2 border-b border-r" style={{ gridRow: 1, gridColumn: 1 }}></div>
                                     {weekDaysInterval.map((day, dayIndex) => ( <div key={day.toISOString()} className={cn("sticky top-0 z-20 bg-card p-2 text-center border-b border-r", { 'bg-primary/10': isToday(day) })} style={{ gridRow: 1, gridColumn: dayIndex + 2 }}> <p className="text-sm text-muted-foreground">{format(day, 'EEE', { locale: es })}</p> <p className={cn("text-xl font-bold text-foreground", { "text-primary": isToday(day) })}>{format(day, 'd')}</p> </div> ))}
-                                    
+
                                     {hours.map((hour, hourIndex) => (
                                         <React.Fragment key={hour}>
                                             <div className="p-2 border-b border-r text-sm text-center text-muted-foreground flex items-center justify-center" style={{ gridRow: hourIndex + 2, gridColumn: 1 }}>{hourIndex % 4 === 0 ? hour : ''}</div>
@@ -140,7 +153,7 @@ const PublicBookingPage = () => {
                     </motion.div>
                 </AnimatePresence>
             </div>
-            
+
             {isModalOpen && ( <PublicBookingModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveAppointment} modalData={modalData} services={services} /> )}
         </>
     );

@@ -8,7 +8,8 @@ import { format, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Phone, MessageSquare, CheckCircle, PartyPopper } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/api';
+import { APP_CONFIG } from '../../config';
 
 const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) => {
     const { toast } = useToast();
@@ -50,11 +51,7 @@ const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) =>
         setError('');
 
         try {
-            // Llama a la primera Edge Function que desplegamos
-            const { error: funcError } = await supabase.functions.invoke('send-verification-code', {
-                body: { phone: `+54${phoneNumber}` }, // IMPORTANTE: Asegúrate de añadir el código de país
-            });
-            if (funcError) throw funcError;
+            await api.sendVerificationCode(`+54${phoneNumber}`, APP_CONFIG.tenantSlug);
             toast({ title: "Código Enviado", description: "Revisa tu teléfono para obtener el código de verificación." });
             setStep('verify');
         } catch (err) {
@@ -72,17 +69,13 @@ const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) =>
         setError('');
 
         try {
-            // Llama a la segunda Edge Function que desplegamos
-            const { data: appointmentDetails, error: funcError } = await supabase.functions.invoke('verify-and-book', {
-                body: { 
-                    phone: `+54${phoneNumber}`, 
-                    code: verificationCode,
-                    serviceId: selectedServiceId,
-                    appointmentAt: modalData.date.toISOString(),
-                    hourIndex: modalData.hourIndex,
-                 },
+            const appointmentDetails = await api.verifyAndBook({
+                phone: `+54${phoneNumber}`,
+                code: verificationCode,
+                serviceId: selectedServiceId,
+                appointmentAt: modalData.date.toISOString(),
+                hourIndex: modalData.hourIndex,
             });
-            if (funcError) throw funcError;
             setStep('success');
             onSave(appointmentDetails);
         } catch (err) {

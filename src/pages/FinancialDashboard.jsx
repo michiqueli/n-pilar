@@ -12,7 +12,7 @@ import FinancialActions from "@/components/financial/FinancialActions";
 import FilterBar from "@/components/financial/FilterBar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import api from "@/lib/api";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 
 const FinancialDashboard = () => {
@@ -34,29 +34,24 @@ const FinancialDashboard = () => {
         const fetchFinancialData = async () => {
             setLoading(true);
             try {
-                const [paymentsRes, expensesRes, clientsRes, servicesRes] = await Promise.all([
-                    supabase.from('payments').select('*, clients(id, name), services(id, name)'),
-                    supabase.from('expenses').select('*'),
-                    supabase.from('clients').select('*'),
-                    supabase.from('services').select('*').eq('active', true)
+                const [paymentsData, expensesData, clientsData, servicesData] = await Promise.all([
+                    api.getPayments(),
+                    api.getExpenses(),
+                    api.getClients(),
+                    api.getActiveServices()
                 ]);
 
-                if (paymentsRes.error) throw paymentsRes.error;
-                if (expensesRes.error) throw expensesRes.error;
-                if (clientsRes.error) throw clientsRes.error;
-                if (servicesRes.error) throw servicesRes.error;
-
-                const incomeTransactions = (paymentsRes.data || []).map((p) => ({
-                    id: p.id, type: "income", clientName: p.clients?.name || "Cliente no especificado",
-                    service: p.services?.name || "Ingreso manual", amount: p.amount,
+                const incomeTransactions = (paymentsData || []).map((p) => ({
+                    id: p.id, type: "income", clientName: p.clients?.name || p.client?.name || "Cliente no especificado",
+                    service: p.services?.name || p.service?.name || "Ingreso manual", amount: p.amount,
                     paymentMethod: p.method, date: p.payment_at, confirmed: p.status === "COMPLETED",
                     appointmentId: p.appointment_id, notes: p.notes, clientId: p.client_id, serviceId: p.service_id
                 }));
 
-                const expenseTransactions = (expensesRes.data || []).map((e) => ({
+                const expenseTransactions = (expensesData || []).map((e) => ({
                     id: e.id, type: "expense", description: e.description,
                     category: e.category || "Gastos", amount: e.amount,
-                    paymentMethod: e.payment_method || "N/A", // <-- CORREGIDO
+                    paymentMethod: e.payment_method || "N/A",
                     date: e.expense_date, receipt: !!e.image_url, notes: e.notes
                 }));
 
@@ -64,8 +59,8 @@ const FinancialDashboard = () => {
                     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
                 setAllTransactions(combinedTransactions);
-                setClients(clientsRes.data || []);
-                setServices(servicesRes.data || []);
+                setClients(clientsData || []);
+                setServices(servicesData || []);
             } catch (error) {
                 console.error("Error fetching financial data:", error);
                 toast({ variant: "destructive", title: "Error al cargar datos", description: "No se pudieron obtener los movimientos financieros." });
@@ -111,50 +106,46 @@ const FinancialDashboard = () => {
         try {
             if (editingTransaction && editingTransaction.id) {
                 if (editingTransaction.type === 'income') {
-                    const { data, error } = await supabase.from('payments').update({
+                    const data = await api.updatePayment(editingTransaction.id, {
                         client_id: transactionData.clientId, service_id: transactionData.serviceId,
                         amount: transactionData.amount, method: transactionData.paymentMethod,
                         notes: transactionData.notes, payment_at: transactionData.date,
-                    }).eq('id', editingTransaction.id).select('*, clients(id, name), services(id, name)').single();
-                    if (error) throw error;
-                    const updatedTx = { ...data, type: 'income', clientName: data.clients?.name, service: data.services?.name, date: data.payment_at, confirmed: true, clientId: data.client_id, serviceId: data.service_id };
+                    });
+                    const updatedTx = { ...data, type: 'income', clientName: data.clients?.name || data.client?.name, service: data.services?.name || data.service?.name, date: data.payment_at, confirmed: true, clientId: data.client_id, serviceId: data.service_id };
                     setAllTransactions(prev => prev.map(t => t.id === editingTransaction.id ? updatedTx : t));
                     toast({ title: "✅ Ingreso Actualizado" });
                 } else {
-                    const { data, error } = await supabase.from('expenses').update({
+                    const data = await api.updateExpense(editingTransaction.id, {
                         description: transactionData.description,
                         amount: transactionData.amount,
                         expense_date: transactionData.date,
                         notes: transactionData.notes,
                         category: transactionData.category,
-                        payment_method: transactionData.paymentMethod, // <-- CORREGIDO
-                    }).eq('id', editingTransaction.id).select().single();
-                    if (error) throw error;
+                        payment_method: transactionData.paymentMethod,
+                    });
                     const updatedTx = { ...data, type: 'expense', paymentMethod: data.payment_method, date: data.expense_date };
                     setAllTransactions(prev => prev.map(t => t.id === editingTransaction.id ? updatedTx : t));
                     toast({ title: "✅ Gasto Actualizado" });
                 }
             } else {
                 if (transactionData.type === "income") {
-                    const { data, error } = await supabase.from("payments").insert({
+                    const data = await api.createPayment({
                         client_id: transactionData.clientId, service_id: transactionData.serviceId,
                         amount: transactionData.amount, method: transactionData.paymentMethod,
                         status: "COMPLETED", notes: transactionData.notes, payment_at: transactionData.date,
-                    }).select("*, clients(id, name), services(id, name)").single();
-                    if (error) throw error;
-                    const newTransaction = { id: data.id, type: "income", clientName: data.clients?.name, service: data.services?.name, amount: data.amount, paymentMethod: data.method, date: data.payment_at, confirmed: true, clientId: data.client_id, serviceId: data.service_id };
+                    });
+                    const newTransaction = { id: data.id, type: "income", clientName: data.clients?.name || data.client?.name, service: data.services?.name || data.service?.name, amount: data.amount, paymentMethod: data.method, date: data.payment_at, confirmed: true, clientId: data.client_id, serviceId: data.service_id };
                     setAllTransactions((prev) => [newTransaction, ...prev]);
                     toast({ title: "🎉 Nuevo ingreso registrado" });
                 } else if (transactionData.type === "expense") {
-                    const { data, error } = await supabase.from("expenses").insert({
+                    const data = await api.createExpense({
                         description: transactionData.description,
                         amount: transactionData.amount,
                         expense_date: transactionData.date,
                         notes: transactionData.notes,
                         category: transactionData.category,
-                        payment_method: transactionData.paymentMethod, // <-- CORREGIDO
-                    }).select().single();
-                    if (error) throw error;
+                        payment_method: transactionData.paymentMethod,
+                    });
                     const newTransaction = { id: data.id, type: "expense", description: data.description, category: data.category, amount: data.amount, paymentMethod: data.payment_method, date: data.expense_date, receipt: false };
                     setAllTransactions((prev) => [newTransaction, ...prev]);
                     toast({ title: "🎉 Nuevo gasto registrado" });
@@ -200,9 +191,11 @@ const FinancialDashboard = () => {
     const confirmDelete = async () => {
         if (!transactionToDelete) return;
         try {
-            const table = transactionToDelete.type === 'income' ? 'payments' : 'expenses';
-            const { error } = await supabase.from(table).delete().eq('id', transactionToDelete.id);
-            if (error) throw error;
+            if (transactionToDelete.type === 'income') {
+                await api.deletePayment(transactionToDelete.id);
+            } else {
+                await api.deleteExpense(transactionToDelete.id);
+            }
             setAllTransactions(prev => prev.filter(t => t.id !== transactionToDelete.id));
             toast({ title: "🗑️ Transacción Eliminada" });
         } catch (error) {

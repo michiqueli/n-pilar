@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Sun, AlertTriangle } from 'lucide-react';
 import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { supabase } from '@/lib/supabaseClient'; // Usamos la ruta correcta
+import { api } from '@/lib/api';
 
 const DailyStatusLine = () => {
     const [todaysAppointments, setTodaysAppointments] = useState([]);
@@ -15,14 +15,7 @@ const DailyStatusLine = () => {
             const todayEnd = endOfDay(new Date()).toISOString();
 
             try {
-                const { data, error } = await supabase
-                    .from('appointments')
-                    .select('*, clients(name)')
-                    .gte('appointment_at', todayStart)
-                    .lte('appointment_at', todayEnd)
-                    .order('appointment_at', { ascending: true });
-
-                if (error) throw error;
+                const data = await api.getAppointments(todayStart, todayEnd);
                 setTodaysAppointments(data || []);
             } catch (error) {
                 console.error("Error fetching today's appointments:", error);

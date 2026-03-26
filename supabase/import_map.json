@@ -1,9 +1,0 @@
-
-{
-  "imports": {
-    "supabase": "https://esm.sh/@supabase/supabase-js@2",
-    "twilio": "npm:twilio",
-    "dayjs": "https://esm.sh/dayjs",
-    "shared/": "./functions/_shared/"
-  }
-}

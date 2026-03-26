@@ -20,7 +20,7 @@ import SummaryTab from '@/components/analytics/SummaryTab';
 import ServicesTab from '@/components/analytics/ServicesTab';
 import HistoricTab from '@/components/analytics/HistoricTab';
 import FinancialDashboard from '@/pages/FinancialDashboard';
-import { supabase } from '@/lib/supabaseClient';
+import api from '@/lib/api';
 import config from '@/config';
 
 dayjs.locale('es');
@@ -72,37 +72,40 @@ const Analitica = () => {
                 const currentMonthEnd = endOfMonth(new Date());
                 const ninetyDaysAgo = startOfDay(subDays(new Date(), 90));
 
-                const [currentPeriodRes, currentPaymentsRes, currentMonthPaymentsRes, prevPeriodPaymentsRes, prevPeriodAppointmentsRes, prevMonthRes, prevPrevMonthRes, historicalRes, heatmapRes] = await Promise.all([
-                    supabase.from('appointments').select('*, services(name, sale_price, service_cost), clients(id, name, total_visits)').gte('appointment_at', dateRange.from.toISOString()).lte('appointment_at', dateRange.to.toISOString()).in('status', ['COMPLETED', 'PAID']),
-                    supabase.from('payments').select('*, services(name, service_cost)').gte('payment_at', dateRange.from.toISOString()).lte('payment_at', dateRange.to.toISOString()),
-                    supabase.from('payments').select('amount').gte('payment_at', currentMonthStart.toISOString()).lte('payment_at', currentMonthEnd.toISOString()),
-                    supabase.from('payments').select('amount').gte('payment_at', prevPeriodStart.toISOString()).lte('payment_at', prevPeriodEnd.toISOString()),
-                    supabase.from('appointments').select('id').gte('appointment_at', prevPeriodStart.toISOString()).lte('appointment_at', prevPeriodEnd.toISOString()).in('status', ['COMPLETED', 'PAID']),
-                    supabase.from('appointments').select('client_id').gte('appointment_at', prevMonthStart.toISOString()).lte('appointment_at', prevMonthEnd.toISOString()).in('status', ['COMPLETED', 'PAID']),
-                    supabase.from('appointments').select('client_id').gte('appointment_at', prevPrevMonthStart.toISOString()).lte('appointment_at', prevPrevMonthEnd.toISOString()).in('status', ['COMPLETED', 'PAID']),
-                    supabase.from('appointments').select('appointment_at, price_at_time').gte('appointment_at', sixMonthsAgo.toISOString()).in('status', ['COMPLETED', 'PAID']),
-                    supabase.from('appointments').select('appointment_at').gte('appointment_at', ninetyDaysAgo.toISOString()).in('status', ['COMPLETED', 'PAID'])
+                const [
+                    currentPeriodData,
+                    currentPaymentsData,
+                    currentMonthPaymentsData,
+                    prevPeriodPaymentsData,
+                    prevPeriodAppointmentsData,
+                    prevMonthData,
+                    prevPrevMonthData,
+                    historicalData,
+                    heatmapData
+                ] = await Promise.all([
+                    api.getAppointments(dateRange.from.toISOString(), dateRange.to.toISOString()),
+                    api.getPayments(dateRange.from.toISOString(), dateRange.to.toISOString()),
+                    api.getPayments(currentMonthStart.toISOString(), currentMonthEnd.toISOString()),
+                    api.getPayments(prevPeriodStart.toISOString(), prevPeriodEnd.toISOString()),
+                    api.getAppointments(prevPeriodStart.toISOString(), prevPeriodEnd.toISOString()),
+                    api.getAppointments(prevMonthStart.toISOString(), prevMonthEnd.toISOString()),
+                    api.getAppointments(prevPrevMonthStart.toISOString(), prevPrevMonthEnd.toISOString()),
+                    api.getAppointments(sixMonthsAgo.toISOString(), new Date().toISOString()),
+                    api.getAppointments(ninetyDaysAgo.toISOString(), new Date().toISOString())
                 ]);
 
-                if (currentPeriodRes.error) throw currentPeriodRes.error;
-                if (currentPaymentsRes.error) throw currentPaymentsRes.error;
-                if (currentMonthPaymentsRes.error) throw currentMonthPaymentsRes.error;
-                if (prevPeriodPaymentsRes.error) throw prevPeriodPaymentsRes.error;
-                if (prevPeriodAppointmentsRes.error) throw prevPeriodAppointmentsRes.error;
-                if (prevMonthRes.error) throw prevMonthRes.error;
-                if (prevPrevMonthRes.error) throw prevPrevMonthRes.error;
-                if (historicalRes.error) throw historicalRes.error;
-                if (heatmapRes.error) throw heatmapRes.error;
+                // Filter completed/paid appointments client-side since the API returns all statuses
+                const filterCompleted = (data) => (data || []).filter(a => ['COMPLETED', 'PAID'].includes(a.status));
 
-                setAppointmentsData(currentPeriodRes.data || []);
-                setPaymentsData(currentPaymentsRes.data || []);
-                setCurrentMonthPayments(currentMonthPaymentsRes.data || []);
-                setPrevPeriodPayments(prevPeriodPaymentsRes.data || []);
-                setPrevPeriodAppointments(prevPeriodAppointmentsRes.data || []);
-                setPrevMonthAppointments(prevMonthRes.data || []);
-                setPrevPrevMonthAppointments(prevPrevMonthRes.data || []);
-                setHistoricalAppointments(historicalRes.data || []);
-                setHeatmapAppointments(heatmapRes.data || []);
+                setAppointmentsData(filterCompleted(currentPeriodData));
+                setPaymentsData(currentPaymentsData || []);
+                setCurrentMonthPayments(currentMonthPaymentsData || []);
+                setPrevPeriodPayments(prevPeriodPaymentsData || []);
+                setPrevPeriodAppointments(filterCompleted(prevPeriodAppointmentsData));
+                setPrevMonthAppointments(filterCompleted(prevMonthData));
+                setPrevPrevMonthAppointments(filterCompleted(prevPrevMonthData));
+                setHistoricalAppointments(filterCompleted(historicalData));
+                setHeatmapAppointments(filterCompleted(heatmapData));
 
             } catch (err) {
                 console.error("Error fetching analytics data:", err);
@@ -159,7 +162,10 @@ const Analitica = () => {
 
         const totalAppointments = appointmentsData.length;
         const averageTicket = totalAppointments > 0 ? periodTotalRevenue / totalAppointments : 0;
-        const newClients = appointmentsData.filter(a => a.clients && a.clients.total_visits <= 1).length;
+        const newClients = appointmentsData.filter(a => {
+            const client = a.clients || a.client;
+            return client && client.total_visits <= 1;
+        }).length;
 
         const prevTotalAppointments = prevPeriodAppointments.length;
         const prevAverageTicket = prevTotalAppointments > 0 ? prevPeriodTotalRevenue / prevTotalAppointments : 0;
@@ -205,10 +211,12 @@ const Analitica = () => {
         };
 
         appointmentsData.forEach(app => {
-            processService(app.services, app.price_at_time, true);
+            const service = app.services || app.service;
+            const client = app.clients || app.client;
+            processService(service, app.price_at_time, true);
 
-            if (app.client_id && app.clients) {
-                if (!clientsMap.has(app.client_id)) clientsMap.set(app.client_id, { name: app.clients?.name, visits: 0, spent: 0 });
+            if (app.client_id && client) {
+                if (!clientsMap.has(app.client_id)) clientsMap.set(app.client_id, { name: client?.name, visits: 0, spent: 0 });
                 const currentClient = clientsMap.get(app.client_id);
                 currentClient.visits += 1;
                 currentClient.spent += app.price_at_time || 0;
@@ -223,7 +231,8 @@ const Analitica = () => {
 
         paymentsData.forEach(payment => {
             if (!payment.appointment_id) {
-                processService(payment.services, payment.amount, false);
+                const service = payment.services || payment.service;
+                processService(service, payment.amount, false);
             }
         });
 

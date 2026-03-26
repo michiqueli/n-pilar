@@ -10,7 +10,7 @@ import ClientForm from '@/components/clients/ClientForm';
 import EmptyState from '@/components/clients/EmptyState';
 import { useNavigate } from 'react-router-dom';
 import ClientListRow from '@/components/clients/ClientListRow';
-import { supabase } from '@/lib/supabaseClient'; 
+import api from '@/lib/api';
 import config from '@/config';
 
 const Clientes = () => {
@@ -52,11 +52,7 @@ const Clientes = () => {
         const fetchClients = async () => {
             setLoading(true);
             try {
-                const { data, error } = await supabase
-                    .from('clients')
-                    .select('*'); 
-
-                if (error) throw error;
+                const data = await api.getClients();
                 setClients(data || []);
             } catch (error) {
                 toast({
@@ -79,7 +75,7 @@ const Clientes = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!formData.name.trim() || !formData.phone.trim()) {
             toast({
                 title: "Datos incompletos",
@@ -91,21 +87,12 @@ const Clientes = () => {
 
         try {
             if (selectedClient) {
-                
-                const { data, error } = await supabase
-                    .from('clients')
-                    .update({
-                        name: formData.name,
-                        phone: formData.phone,
-                        email: formData.email,
-                        notes: formData.notes,
-                        // preferred_service_id: formData.preferredServiceId
-                    })
-                    .eq('id', selectedClient.id)
-                    .select()
-                    .single();
-
-                if (error) throw error;
+                const data = await api.updateClient(selectedClient.id, {
+                    name: formData.name,
+                    phone: formData.phone,
+                    email: formData.email,
+                    notes: formData.notes,
+                });
 
                 setClients(prev => prev.map(client => client.id === selectedClient.id ? data : client));
                 toast({
@@ -114,20 +101,12 @@ const Clientes = () => {
                 });
 
             } else {
-                
-                const { data, error } = await supabase
-                    .from('clients')
-                    .insert({
-                        name: formData.name,
-                        phone: formData.phone,
-                        email: formData.email || null,
-                        notes: formData.notes,
-                        // preferred_service_id: formData.preferredServiceId
-                    })
-                    .select()
-                    .single();
-                
-                if (error) throw error;
+                const data = await api.createClient({
+                    name: formData.name,
+                    phone: formData.phone,
+                    email: formData.email || null,
+                    notes: formData.notes,
+                });
 
                 setClients(prev => [...prev, data]);
                 toast({
@@ -150,7 +129,7 @@ const Clientes = () => {
         setSelectedClient(null);
         setIsModalOpen(false);
     };
-    
+
     const openNewClientModal = () => {
         setSelectedClient(null);
         setFormData({ name: '', phone: '', email: '', notes: '', preferred_service_id: null });
@@ -171,12 +150,7 @@ const Clientes = () => {
 
     const handleDelete = async (clientId) => {
         try {
-            const { error } = await supabase
-                .from('clients')
-                .delete()
-                .eq('id', clientId);
-            
-            if (error) throw error;
+            await api.deleteClient(clientId);
 
             setClients(prev => prev.filter(client => client.id !== clientId));
             toast({
@@ -191,7 +165,7 @@ const Clientes = () => {
             });
         }
     };
-    
+
     const handleFeatureNotImplemented = (featureName) => {
         toast({
             title: `🚧 ${featureName} no disponible`,
@@ -258,7 +232,7 @@ const Clientes = () => {
                         <h1 className="text-3xl font-bold text-foreground">Mis Clientes</h1>
                         <p className="text-muted-foreground mt-1">Tu base de datos para construir relaciones duraderas.</p>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         {/*<DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -280,7 +254,7 @@ const Clientes = () => {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>*/}
-                        
+
                         <Button onClick={openNewClientModal} variant="primary" className="w-full md:w-auto" size="lg">
                             <UserPlus className="w-4 h-4 mr-2" />
                             Nuevo Cliente
@@ -307,10 +281,10 @@ const Clientes = () => {
                         isMobile={isMobile}
                     />
                 </motion.div>
-                
+
                 <AnimatePresence mode="wait">
                     {filteredAndSortedClients.length > 0 ? (
-                        <motion.div 
+                        <motion.div
                             key={viewMode}
                             className={viewClasses[viewMode]}
                             initial={{ opacity: 0 }}
@@ -319,7 +293,7 @@ const Clientes = () => {
                         >
                         {filteredAndSortedClients.map((client, index) => {
                             if (viewMode === 'list') {
-                                return <ClientListRow 
+                                return <ClientListRow
                                     key={client.id}
                                     client={client}
                                     onEdit={handleEdit}
@@ -341,7 +315,7 @@ const Clientes = () => {
                         })}
                         </motion.div>
                     ) : (
-                        <motion.div 
+                        <motion.div
                             key="empty-state"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -356,11 +330,11 @@ const Clientes = () => {
                                 <p className="text-muted-foreground mb-4">
                                     Intenta ajustar los filtros o el término de búsqueda.
                                 </p>
-                                <Button 
+                                <Button
                                     onClick={() => {
                                     setSearchTerm('');
                                     setFilterBy('all');
-                                    }} 
+                                    }}
                                     variant="secondary"
                                 >
                                     Limpiar filtros

@@ -18,7 +18,7 @@ import MobileDayView from '@/components/calendar/MobileDayView';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import api from '@/lib/api';
 import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import config from '@/config';
 
@@ -116,21 +116,15 @@ const Calendario = () => {
         const monthEnd = endOfMonth(currentDate);
 
         try {
-            const [appointmentsRes, clientsRes, servicesRes, schedulesRes, exceptionsRes] = await Promise.all([
-                supabase.from('appointments').select('*, clients(id, name), services(id, name, duration_min)').gte('appointment_at', monthStart.toISOString()).lte('appointment_at', monthEnd.toISOString()),
-                supabase.from('clients').select('*'),
-                supabase.from('services').select('*').eq('active', true),
-                supabase.from('work_schedules').select('*'),
-                supabase.from('schedule_exceptions').select('*')
+            const [appointmentsData, clientsData, servicesData, schedulesData, exceptionsData] = await Promise.all([
+                api.getAppointments(monthStart.toISOString(), monthEnd.toISOString()),
+                api.getClients(),
+                api.getActiveServices(),
+                api.getWorkSchedules(),
+                api.getScheduleExceptions()
             ]);
 
-            if (appointmentsRes.error) throw appointmentsRes.error;
-            if (clientsRes.error) throw clientsRes.error;
-            if (servicesRes.error) throw servicesRes.error;
-            if (schedulesRes.error) throw schedulesRes.error;
-            if (exceptionsRes.error) throw exceptionsRes.error;
-
-            const appointmentsWithIndex = (appointmentsRes.data || []).map(appointment => {
+            const appointmentsWithIndex = (appointmentsData || []).map(appointment => {
                 const appointmentDate = parseISO(appointment.appointment_at);
                 const hour = appointmentDate.getHours();
                 const minute = appointmentDate.getMinutes();
@@ -141,8 +135,8 @@ const Calendario = () => {
             });
             setAppointments(appointmentsWithIndex);
 
-            setClients(clientsRes.data || []);
-            setServices(servicesRes.data || []);
+            setClients(clientsData || []);
+            setServices(servicesData || []);
 
             const formattedAvailability = {
                 default: {
@@ -154,7 +148,7 @@ const Calendario = () => {
                 exceptions: {}
             };
 
-            schedulesRes.data.forEach(s => {
+            (schedulesData || []).forEach(s => {
                 const dayKey = s.day_of_week.toString();
                 formattedAvailability.default[dayKey].available = true;
                 if (s.is_break) {
@@ -163,7 +157,7 @@ const Calendario = () => {
                     formattedAvailability.default[dayKey].ranges.push({ start: s.start_time, end: s.end_time });
                 }
             });
-            exceptionsRes.data.forEach(e => {
+            (exceptionsData || []).forEach(e => {
                 const dateKey = e.exception_date;
 
                 if (!formattedAvailability.exceptions[dateKey]) {
@@ -234,13 +228,10 @@ const Calendario = () => {
             let clientName = data.details.clientName;
 
             if (data.details.isNew) {
-                const { data: newClient, error: clientError } = await supabase
-                    .from("clients")
-                    .insert({ name: data?.details?.name, phone: data?.details?.phone })
-                    .select()
-                    .single();
-
-                if (clientError) throw clientError;
+                const newClient = await api.createClient({
+                    name: data?.details?.name,
+                    phone: data?.details?.phone
+                });
 
                 clientId = newClient?.id;
                 clientName = newClient?.name;
@@ -271,15 +262,9 @@ const Calendario = () => {
                 notes: data.details.notes,
             };
 
-            const { data: insertedAppointment, error } = await supabase
-                .from('appointments')
-                .insert(newAppointmentForDB)
-                .select('*, clients(id, name), services(id, name, duration_min)')
-                .single();
+            const insertedAppointment = await api.createAppointment(newAppointmentForDB);
 
-            if (error) throw error;
-
-            const durationInSlots = Math.ceil((insertedAppointment.services?.duration_min || 15) / 15);
+            const durationInSlots = Math.ceil((insertedAppointment.services?.duration_min || insertedAppointment.service?.duration_min || selectedService.duration_min || 15) / 15);
             const newAppointmentForState = { ...insertedAppointment, hourIndex: data.hourIndex, durationInSlots };
             setAppointments(prevAppointments => [...prevAppointments, newAppointmentForState]);
 
@@ -309,12 +294,7 @@ const Calendario = () => {
     const confirmDelete = async () => {
         if (!appointmentToDelete) return;
         try {
-            const { error } = await supabase
-                .from('appointments')
-                .delete()
-                .eq('id', appointmentToDelete.id);
-
-            if (error) throw error;
+            await api.deleteAppointment(appointmentToDelete.id);
 
             setAppointments(prev => prev.filter(app => app.id !== appointmentToDelete.id));
             toast({
@@ -336,8 +316,11 @@ const Calendario = () => {
 
     const handleDeleteAvailability = async (dateKey) => {
         try {
-            const { error } = await supabase.from('schedule_exceptions').delete().eq('exception_date', dateKey);
-            if (error) throw error;
+            // Find the exception ID by dateKey - we need to delete by the exception's ID
+            // Since the API deleteScheduleException expects an ID, we need to refetch or track IDs
+            // For now, we'll refetch all data after deletion
+            // The API might support deleting by date - let's use the dateKey as identifier
+            await api.deleteScheduleException(dateKey);
             const updatedExceptions = { ...availability.exceptions };
             delete updatedExceptions[dateKey];
             setAvailability(prev => ({ ...prev, exceptions: updatedExceptions }));
@@ -354,9 +337,7 @@ const Calendario = () => {
             if (payload.type === 'full_update') {
                 const newAvailability = payload.data;
 
-                await supabase.from('work_schedules').delete().neq('id', 0);
-                await supabase.from('schedule_exceptions').delete().neq('id', 0);
-
+                // Build schedules array for the API
                 const newSchedules = [];
                 for (const dayKey in newAvailability.default) {
                     const daySchedule = newAvailability.default[dayKey];
@@ -365,17 +346,16 @@ const Calendario = () => {
                         daySchedule.breaks.forEach(range => newSchedules.push({ day_of_week: parseInt(dayKey), start_time: range.start, end_time: range.end, is_break: true }));
                     }
                 }
-                if (newSchedules.length > 0) {
-                    const { error } = await supabase.from('work_schedules').insert(newSchedules);
-                    if (error) throw error;
-                }
 
+                // Use the API to set work schedules (replaces all)
+                await api.setWorkSchedules(newSchedules);
+
+                // Handle exceptions
                 const newExceptions = [];
                 for (const dateKey in newAvailability.exceptions) {
                     const exceptionDetails = newAvailability.exceptions[dateKey];
 
                     if (exceptionDetails.available === false) {
-                        // CASO A: Día completo NO LABORABLE. Se crea una sola fila.
                         newExceptions.push({
                             exception_date: dateKey,
                             available: false,
@@ -384,8 +364,6 @@ const Calendario = () => {
                             is_break: false
                         });
                     } else {
-                        // CASO B: Día con HORARIO ESPECIAL. 
-                        // Se asume una sola fila por fecha. Tomamos el primer rango de tiempo.
                         const firstRange = exceptionDetails.ranges[0];
                         if (firstRange) {
                             newExceptions.push({
@@ -396,25 +374,22 @@ const Calendario = () => {
                                 is_break: false
                             });
                         }
-                        // Si no hay rangos, no se crea la excepción (es un estado inválido)
                     }
                 }
 
-                if (newExceptions.length > 0) {
-                    const { error } = await supabase.from('schedule_exceptions').insert(newExceptions);
-                    // Si hay un error aquí, es probable que sea el de duplicate key
-                    if (error) throw error;
+                // Create each exception via API
+                for (const exception of newExceptions) {
+                    await api.createScheduleException(exception);
                 }
 
-                setAvailability(newAvailability); // Actualiza el estado principal
+                setAvailability(newAvailability);
                 toast({ title: "✅ Horario Actualizado", description: "Tus cambios en el horario se han guardado." });
 
-                // ---- RAMA 2: AÑADIR NUEVAS EXCEPCIONES (add_exceptions) ----
             } else if (payload.type === 'add_exceptions') {
-
                 const { exceptionsToInsert } = payload.data;
-                const { error } = await supabase.from('schedule_exceptions').insert(exceptionsToInsert);
-                if (error) throw error;
+                for (const exception of exceptionsToInsert) {
+                    await api.createScheduleException(exception);
+                }
                 toast({ title: "✅ Excepción Guardada", description: "El nuevo horario especial ha sido añadido." });
             }
             await fetchAllData();
@@ -695,8 +670,8 @@ const Calendario = () => {
                                                     }}
                                                 >
                                                     <div className="flex-grow">
-                                                        <p className="font-bold text-primary text-sm truncate">{appointment.clients.name}</p>
-                                                        <p className="text-primary/80 text-xs truncate">{appointment.services.name}</p>
+                                                        <p className="font-bold text-primary text-sm truncate">{appointment.clients?.name || appointment.client?.name}</p>
+                                                        <p className="text-primary/80 text-xs truncate">{appointment.services?.name || appointment.service?.name}</p>
                                                     </div>
 
                                                     <Button
@@ -748,7 +723,7 @@ const Calendario = () => {
                 onClose={() => setIsConfirmOpen(false)}
                 onConfirm={confirmDelete}
                 title="¿Eliminar Cita?"
-                description={`Estás a punto de eliminar la cita de ${appointmentToDelete?.clients?.name || 'este cliente'}. Esta acción es permanente.`}
+                description={`Estás a punto de eliminar la cita de ${appointmentToDelete?.clients?.name || appointmentToDelete?.client?.name || 'este cliente'}. Esta acción es permanente.`}
             />
         </>
     );

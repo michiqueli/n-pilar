@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { UploadCloud, Image as ImageIcon } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+// Image upload removed - no storage endpoint in API yet
 
 const ServiceForm = ({ service, onSave, onClose }) => {
   const { toast } = useToast();
@@ -97,22 +97,11 @@ const ServiceForm = ({ service, onSave, onClose }) => {
     try {
       let finalImageUrl = formData.image_url;
 
+      // TODO: Image upload not yet supported via API - use image URL directly for now
       if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("service-images")
-          .upload(filePath, imageFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("service-images")
-          .getPublicUrl(filePath);
-
-        finalImageUrl = urlData.publicUrl;
+        // Image file selected but upload endpoint not available yet
+        // Keep the preview URL for local display; actual upload requires backend storage endpoint
+        console.warn("Image upload not yet supported via API. Image will not be persisted.");
       }
 
       const dataToSave = {

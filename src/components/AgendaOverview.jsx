@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Users, Calendar, AlertCircle, Sparkles, DollarSign, Repeat, Scissors } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { startOfDay, endOfDay, getDay } from 'date-fns';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/api';
 
 const AgendaOverview = () => {
     const { toast } = useToast();
@@ -22,23 +22,13 @@ const AgendaOverview = () => {
             const todayDayOfWeek = getDay(new Date());
 
             try {
-                const [appointmentsRes, workSchedulesRes] = await Promise.all([
-                    supabase
-                        .from('appointments')
-                        .select('*, clients(total_visits)')
-                        .gte('appointment_at', todayStart)
-                        .lte('appointment_at', todayEnd),
-                    supabase
-                        .from('work_schedules')
-                        .select('*')
-                        .eq('day_of_week', todayDayOfWeek)
+                const [allAppointments, allSchedules] = await Promise.all([
+                    api.getAppointments(todayStart, todayEnd),
+                    api.getWorkSchedules(),
                 ]);
 
-                if (appointmentsRes.error) throw appointmentsRes.error;
-                if (workSchedulesRes.error) throw workSchedulesRes.error;
-
-                const todaysAppointments = appointmentsRes.data || [];
-                const todaysSchedules = workSchedulesRes.data || [];
+                const todaysAppointments = allAppointments || [];
+                const todaysSchedules = (allSchedules || []).filter(s => s.day_of_week === todayDayOfWeek);
 
                 const totalAppointments = todaysAppointments.filter(a => a.status !== 'CANCELLED').length;
                 const cancelledToday = todaysAppointments.filter(a => a.status === 'CANCELLED').length;

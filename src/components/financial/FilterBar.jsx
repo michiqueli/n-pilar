@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/api';
 import PeriodPicker from '../analytics/PeriodPicker';
 import dayjs from 'dayjs';
 
@@ -29,17 +29,11 @@ const FilterBar = ({ onApplyFilters, onClearFilters }) => {
     useEffect(() => {
         const fetchServices = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('services')
-                    .select('name')
-                    .eq('active', true);
-
-                if (error) throw error;
-
+                const data = await api.getActiveServices();
                 const serviceNames = data.map(s => s.name);
                 setIncomeServices(serviceNames);
             } catch (error) {
-                console.error("Failed to load services from Supabase", error);
+                console.error("Failed to load services", error);
             }
         };
         fetchServices();

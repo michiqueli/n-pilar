@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import AppointmentModal from '@/components/calendar/AppointmentModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, startOfDay, endOfDay, parseISO } from 'date-fns';
-import { supabase } from '@/lib/supabaseClient'; // Usamos la ruta correcta
+import { api } from '@/lib/api';
 
 const TodaySchedule = () => {
     const { toast } = useToast();
@@ -26,27 +26,17 @@ const TodaySchedule = () => {
             const todayDayOfWeek = new Date().getDay();
 
             try {
-                const [appointmentsRes, clientsRes, servicesRes, schedulesRes] = await Promise.all([
-                    supabase
-                        .from('appointments')
-                        .select('*, clients(id, name, phone), services(*)')
-                        .gte('appointment_at', todayStart)
-                        .lte('appointment_at', todayEnd)
-                        .order('appointment_at', { ascending: true }),
-                    supabase.from('clients').select('*'),
-                    supabase.from('services').select('*').eq('active', true),
-                    supabase.from('work_schedules').select('*').eq('day_of_week', todayDayOfWeek)
+                const [appointmentsData, clientsData, servicesData, allSchedules] = await Promise.all([
+                    api.getAppointments(todayStart, todayEnd),
+                    api.getClients(),
+                    api.getActiveServices(),
+                    api.getWorkSchedules(),
                 ]);
 
-                if (appointmentsRes.error) throw appointmentsRes.error;
-                if (clientsRes.error) throw clientsRes.error;
-                if (servicesRes.error) throw servicesRes.error;
-                if (schedulesRes.error) throw schedulesRes.error;
-
-                setAppointments(appointmentsRes.data || []);
-                setClients(clientsRes.data || []);
-                setServices(servicesRes.data || []);
-                setWorkSchedules(schedulesRes.data || []);
+                setAppointments(appointmentsData || []);
+                setClients(clientsData || []);
+                setServices(servicesData || []);
+                setWorkSchedules((allSchedules || []).filter(s => s.day_of_week === todayDayOfWeek));
 
             } catch (error) {
                 console.error("Error fetching today's schedule:", error);
@@ -118,19 +108,15 @@ const TodaySchedule = () => {
             window.open(`https://wa.me/${cleanPhoneNumber}?text=${message}`, '_blank');
 
             // Actualizamos la base de datos para marcar el recordatorio como enviado
-            const { error } = await supabase
-                .from('appointments')
-                .update({ reminder_sent: true })
-                .eq('id', appointment.id);
-
-            if (error) {
-                toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el estado del recordatorio." });
-            } else {
+            try {
+                await api.updateAppointment(appointment.id, { reminder_sent: true });
                 // Actualizamos el estado local para que la UI cambie al instante
-                setAppointments(prev => prev.map(apt => 
+                setAppointments(prev => prev.map(apt =>
                     apt.id === appointment.id ? { ...apt, reminder_sent: true } : apt
                 ));
                 toast({ title: "📱 Recordatorio Enviado", description: "Se ha abierto WhatsApp para enviar el mensaje." });
+            } catch (error) {
+                toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el estado del recordatorio." });
             }
         } else {
             toast({
@@ -173,9 +159,7 @@ const TodaySchedule = () => {
             let clientName = data.details.clientName;
 
             if (data.details.isNew) {
-                const { data: newClient, error: clientError } = await supabase
-                    .from('clients').insert({ name: data?.details?.name, phone: data?.details?.phone }).select().single();
-                if (clientError) throw clientError;
+                const newClient = await api.createClient({ name: data?.details?.name, phone: data?.details?.phone });
                 clientId = newClient.id;
                 clientName = newClient?.name;
                 setClients(prev => [...prev, newClient]);
@@ -201,11 +185,8 @@ const TodaySchedule = () => {
                 notes: data.details.notes,
             };
 
-            const { data: insertedAppointment, error } = await supabase
-                .from('appointments').insert(newAppointmentForDB).select('*, clients(id, name), services(id, name, duration_min)').single();
+            const insertedAppointment = await api.createAppointment(newAppointmentForDB);
 
-            if (error) throw error;
-            
             setAppointments(prev => [...prev, insertedAppointment].sort((a,b) => a.appointment_at.localeCompare(b.appointment_at)));
             setIsModalOpen(false);
             toast({

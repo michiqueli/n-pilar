@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import PaymentModal from '@/components/payments/PaymentModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, parseISO, startOfDay, endOfDay, addMinutes } from 'date-fns';
-import { supabase } from '@/lib/supabaseClient'; // Usamos la ruta correcta
+import { api } from '@/lib/api';
 import 'swiper/css';
 import 'swiper/css/navigation';
 
@@ -89,14 +89,7 @@ const ClientCarousel = () => {
             const todayEnd = endOfDay(new Date()).toISOString();
 
             try {
-                const { data, error } = await supabase
-                    .from('appointments')
-                    .select('*, clients(*), services(*)')
-                    .gte('appointment_at', todayStart)
-                    .lte('appointment_at', todayEnd)
-                    .order('appointment_at', { ascending: true });
-
-                if (error) throw error;
+                const data = await api.getAppointments(todayStart, todayEnd);
                 setAppointments(data || []);
             } catch (error) {
                 toast({
@@ -155,24 +148,17 @@ const ClientCarousel = () => {
 
     const handleSavePayment = async (paymentData) => {
         try {
-            const { error } = await supabase
-                .from('payments')
-                .insert({
-                    appointment_id: selectedAppointment.id,
-                    client_id: selectedAppointment.clients.id,
-                    amount: paymentData.amount,
-                    method: paymentData.paymentMethod,
-                    status: 'COMPLETED',
-                    notes: paymentData.notes,
-                    payment_at: new Date().toISOString(),
-                });
+            await api.createPayment({
+                appointment_id: selectedAppointment.id,
+                client_id: selectedAppointment.clients.id,
+                amount: paymentData.amount,
+                method: paymentData.paymentMethod,
+                status: 'COMPLETED',
+                notes: paymentData.notes,
+                payment_at: new Date().toISOString(),
+            });
 
-            if (error) throw error;
-
-            await supabase
-                .from('appointments')
-                .update({ status: 'PAID' })
-                .eq('id', selectedAppointment.id);
+            await api.updateAppointment(selectedAppointment.id, { status: 'PAID' });
 
             setAppointments(prev => prev.map(app =>
                 app.id === selectedAppointment.id ? { ...app, status: 'PAID' } : app

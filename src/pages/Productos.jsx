@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/lib/supabaseClient';
+import api from '@/lib/api';
 import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import config from '@/config';
 
@@ -46,8 +46,7 @@ const Productos = () => {
         const fetchServices = async () => {
             setLoading(true);
             try {
-                const { data, error } = await supabase.from('services').select('*');
-                if (error) throw error;
+                const data = await api.getServices();
                 setServices(data || []);
             } catch (error) {
                 toast({
@@ -102,13 +101,11 @@ const Productos = () => {
         try {
             const { id, ...dataToSave } = serviceData;
             if (id) {
-                const { data, error } = await supabase.from('services').update(dataToSave).eq('id', id).select().single();
-                if (error) throw error;
+                const data = await api.updateService(id, dataToSave);
                 setServices(services.map(s => s.id === data.id ? data : s));
                 toast({ title: "✅ Servicio Actualizado" });
             } else {
-                const { data, error } = await supabase.from('services').insert(dataToSave).select().single();
-                if (error) throw error;
+                const data = await api.createService(dataToSave);
                 setServices([...services, data]);
                 toast({ title: "🎉 Servicio Agregado" });
             }
@@ -122,8 +119,7 @@ const Productos = () => {
         const service = services.find(s => s.id === serviceId);
         if (!service) return;
         try {
-            const { data, error } = await supabase.from('services').update({ popular: !service.popular }).eq('id', serviceId).select().single();
-            if (error) throw error;
+            const data = await api.updateService(serviceId, { popular: !service.popular });
             setServices(services.map(s => s.id === serviceId ? data : s));
             toast({ title: "⭐ Estado Actualizado" });
         } catch (error) {
@@ -133,8 +129,7 @@ const Productos = () => {
 
     const handleDeactivateService = async (serviceId) => {
         try {
-            const { data, error } = await supabase.from('services').update({ active: false }).eq('id', serviceId).select().single();
-            if (error) throw error;
+            const data = await api.updateService(serviceId, { active: false });
             setServices(services.map(s => s.id === serviceId ? data : s));
             toast({ title: "🗑️ Servicio Desactivado" });
         } catch (error) {
@@ -144,8 +139,7 @@ const Productos = () => {
 
     const handleReactivateService = async (serviceId) => {
         try {
-            const { data, error } = await supabase.from('services').update({ active: true }).eq('id', serviceId).select().single();
-            if (error) throw error;
+            const data = await api.updateService(serviceId, { active: true });
             setServices(services.map(s => s.id === serviceId ? data : s));
             toast({ title: "✅ Servicio Reactivado" });
         } catch (error) {
@@ -161,8 +155,7 @@ const Productos = () => {
     const confirmPermanentDelete = async () => {
         if (!serviceToDelete) return;
         try {
-            const { error } = await supabase.from('services').delete().eq('id', serviceToDelete.id);
-            if (error) throw error;
+            await api.deleteService(serviceToDelete.id);
             setServices(services.filter(s => s.id !== serviceToDelete.id));
             toast({ title: "🔥 Servicio Eliminado Permanentemente" });
         } catch (error) {
@@ -174,7 +167,7 @@ const Productos = () => {
     };
 
     const EmptyState = () => (
-        <motion.div 
+        <motion.div
             className="text-center py-20 text-muted-foreground"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -185,7 +178,7 @@ const Productos = () => {
                 {showInactive ? "No hay servicios inactivos" : "Tu catálogo está vacío"}
             </h3>
             <p className="mb-6 max-w-md mx-auto">
-                {searchTerm || selectedCategory !== 'Todos' 
+                {searchTerm || selectedCategory !== 'Todos'
                     ? "No se encontraron servicios que coincidan con tu búsqueda."
                     : (showInactive ? "Todos tus servicios están activos." : "¡Es hora de empezar! Agrega tu primer servicio.")
                 }
@@ -209,7 +202,7 @@ const Productos = () => {
                 <title>{`Servicios - ${config.appName}`}</title>
                 <meta name="description" content="Catálogo completo de servicios y precios de la barbería" />
             </Helmet>
-            
+
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 {isModalOpen && <ServiceForm service={selectedService} onSave={handleSaveService} onClose={handleCloseModal} />}
             </Dialog>
@@ -233,7 +226,7 @@ const Productos = () => {
                         <h1 className="text-3xl font-bold text-foreground mb-1">Catálogo de Servicios</h1>
                         <p className="text-muted-foreground text-lg">Gestiona tu oferta de servicios profesionales.</p>
                     </div>
-                    
+
                     <Button onClick={() => handleOpenModal()} variant="primary" size="lg">
                         <Plus className="w-5 h-5 mr-2" />
                         Nuevo Servicio
@@ -246,7 +239,7 @@ const Productos = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.1 }}
                 >
-                    <CategoryFilter 
+                    <CategoryFilter
                         categories={categories}
                         selectedCategory={selectedCategory}
                         onCategoryChange={setSelectedCategory}
@@ -256,7 +249,7 @@ const Productos = () => {
                     <div className="flex flex-col md:flex-row gap-4 mb-6 border-t pt-6">
                         <div className="relative flex-grow">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                            <Input 
+                            <Input
                                 placeholder="Buscar por nombre..."
                                 className="pl-10"
                                 value={searchTerm}
@@ -289,16 +282,16 @@ const Productos = () => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2 mb-6">
                         <Switch id="show-inactive" checked={showInactive} onCheckedChange={setShowInactive} />
                         <Label htmlFor="show-inactive">Mostrar inactivos</Label>
                     </div>
 
-                    <motion.div 
-                        layout 
+                    <motion.div
+                        layout
                         className={cn("grid gap-6", viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1")}
-                    >                      
+                    >
                             {filteredServices.length > 0 ? (
                                 filteredServices.map((service, index) => (
                                     viewMode === 'grid' ? (

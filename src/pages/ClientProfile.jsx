@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { supabase } from '@/lib/supabaseClient';
+import api from '@/lib/api';
 import ClientForm from '@/components/clients/ClientForm'; // Importamos el formulario
 
 const ClientProfile = () => {
@@ -34,24 +34,16 @@ const ClientProfile = () => {
 
             setLoading(true);
             try {
-                const { data: clientData, error: clientError } = await supabase
-                    .from('clients')
-                    .select('*')
-                    .eq('id', id)
-                    .single();
-
-                if (clientError) throw clientError;
+                // getClient returns client with appointments included
+                const clientData = await api.getClient(id);
                 setClient(clientData);
 
-                const { data: historyData, error: historyError } = await supabase
-                    .from('appointments')
-                    .select('*, services(name)')
-                    .eq('client_id', id)
-                    .in('status', ['COMPLETED', 'PAID'])
-                    .order('appointment_at', { ascending: false });
-
-                if (historyError) throw historyError;
-                setAppointmentHistory(historyData || []);
+                // Extract appointment history from client data if available,
+                // otherwise it's included in the client response
+                const history = (clientData.appointments || [])
+                    .filter(a => ['COMPLETED', 'PAID'].includes(a.status))
+                    .sort((a, b) => new Date(b.appointment_at) - new Date(a.appointment_at));
+                setAppointmentHistory(history);
 
             } catch (error) {
                 console.error("Error fetching client profile:", error);
@@ -110,7 +102,7 @@ const ClientProfile = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!formData.name.trim() || !formData.phone.trim()) {
             toast({
                 title: "Datos incompletos",
@@ -121,19 +113,12 @@ const ClientProfile = () => {
         }
 
         try {
-            const { data: updatedClient, error } = await supabase
-                .from('clients')
-                .update({
-                    name: formData.name,
-                    phone: formData.phone,
-                    email: formData.email,
-                    notes: formData.notes,
-                })
-                .eq('id', client.id)
-                .select()
-                .single();
-
-            if (error) throw error;
+            const updatedClient = await api.updateClient(client.id, {
+                name: formData.name,
+                phone: formData.phone,
+                email: formData.email,
+                notes: formData.notes,
+            });
 
             setClient(updatedClient); // Actualizamos el perfil en la página al instante
             toast({
@@ -201,7 +186,7 @@ const ClientProfile = () => {
                 <meta name="description" content={`Perfil detallado de ${client?.name}, incluyendo historial de servicios y preferencias.`} />
             </Helmet>
 
-            <motion.div 
+            <motion.div
                 className="space-y-8"
                 variants={containerVariants}
                 initial="hidden"
@@ -245,7 +230,7 @@ const ClientProfile = () => {
                                             </div>
                                             <div className="flex-grow">
                                                 <div className="flex justify-between items-center">
-                                                    <p className="font-semibold text-foreground">{appointment.services?.name || 'Servicio no especificado'}</p>
+                                                    <p className="font-semibold text-foreground">{appointment.services?.name || appointment.service?.name || 'Servicio no especificado'}</p>
                                                     <p className="text-sm font-bold text-success">${appointment.price_at_time.toFixed(2)}</p>
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">{format(parseISO(appointment.appointment_at), 'PPP', { locale: es })}</p>
