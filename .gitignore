@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .env
 
+# Logo por instancia (cada tenant tiene el suyo)
+public/logo*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
