@@ -114,6 +114,16 @@
     .swiper-slide > div {
       @apply h-full;
     }
+
+    /* Calendar: días con disponibilidad */
+    .day-available:not([disabled]):not([aria-selected]) {
+      background-color: hsl(var(--success) / 0.15);
+      color: hsl(var(--success));
+      font-weight: 600;
+    }
+    .day-available:not([disabled]):not([aria-selected]):hover {
+      background-color: hsl(var(--success) / 0.25);
+    }
 }
 
 ::-webkit-scrollbar {

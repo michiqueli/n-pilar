@@ -95,6 +95,16 @@ const PublicBookingPage = () => {
 
     const selectedService = useMemo(() => services.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
 
+    // Verifica si un día tiene disponibilidad según schedule/excepciones
+    const isDayAvailable = (date) => {
+        const dateKey = format(date, 'yyyy-MM-dd');
+        const dayOfWeek = date.getDay().toString();
+        const exception = availability.exceptions[dateKey];
+        if (exception) return exception.available;
+        const defaultSched = availability.default[dayOfWeek];
+        return defaultSched && defaultSched.available;
+    };
+
     // Días visibles: desktop 7 desde hoy, mobile 2 desde selectedDate
     const visibleDays = useMemo(() => {
         const today = startOfDay(new Date());
@@ -210,7 +220,16 @@ const PublicBookingPage = () => {
                                     mode="single"
                                     selected={selectedDate}
                                     onSelect={(date) => date && setSelectedDate(date)}
-                                    disabled={(date) => isBefore(startOfDay(date), startOfDay(new Date()))}
+                                    disabled={(date) =>
+                                        isBefore(startOfDay(date), startOfDay(new Date())) || !isDayAvailable(date)
+                                    }
+                                    modifiers={{
+                                        available: (date) =>
+                                            !isBefore(startOfDay(date), startOfDay(new Date())) && isDayAvailable(date),
+                                    }}
+                                    modifiersClassNames={{
+                                        available: 'day-available',
+                                    }}
                                     initialFocus
                                 />
                             </PopoverContent>
