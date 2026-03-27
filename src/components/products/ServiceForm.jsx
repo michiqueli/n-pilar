@@ -204,6 +204,7 @@ const ServiceForm = ({ service, onSave, onClose, categories = [] }) => {
           <Select
             onValueChange={(value) => handleSelectChange("category", value)}
             value={formData.category}
+            placeholder="Seleccionar Categoria"
           >
             <SelectTrigger>
               <SelectValue placeholder="Seleccionar categoría" />
