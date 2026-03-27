@@ -147,6 +147,29 @@ class ApiClient {
     return this.request(`/services/${id}`, { method: 'DELETE' });
   }
 
+  // Categories
+  getCategories() {
+    return this.request('/categories');
+  }
+
+  createCategory(data) {
+    return this.request('/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  updateCategory(id, data) {
+    return this.request(`/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  deleteCategory(id) {
+    return this.request(`/categories/${id}`, { method: 'DELETE' });
+  }
+
   // Appointments
   getAppointments(from, to) {
     const params = new URLSearchParams();

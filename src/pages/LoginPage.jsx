@@ -58,7 +58,7 @@ const LoginPage = () => {
                 >
                     <div className="bg-card/80 backdrop-blur-lg p-8 rounded-2xl shadow-2xl border border-white/10">
                         <div className="flex flex-col items-center mb-8">
-                            <BusinessLogo size="xl" className="mb-4 rounded-2xl" />
+                            <BusinessLogo size="xl" className="mb-4" />
                             <h2 className="text-center text-3xl font-bold tracking-tight text-foreground">
                                 {config.appName}
                             </h2>

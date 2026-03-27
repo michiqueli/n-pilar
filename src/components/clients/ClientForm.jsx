@@ -2,10 +2,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion, AnimatePresence } from 'framer-motion';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 
 const ClientForm = ({
   isOpen,
@@ -70,31 +69,15 @@ const ClientForm = ({
 
                 <div>
                   <Label>Servicio Preferido</Label>
-                  <Select
-                    onValueChange={(value) => onInputChange('preferred_service_id', value === 'none' ? null : value)}
-                    value={formData.preferred_service_id || 'none'}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar servicio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin definir</SelectItem>
-                      {services.map(service => (
-                        <SelectItem key={service.id} value={service.id.toString()}>
-                          {service.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="notes">Notas y Preferencias</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes || ''}
-                    onChange={(e) => onInputChange('notes', e.target.value)}
-                    placeholder="Alergias, preferencias, productos usados, etc."
+                  <SearchableSelect
+                    items={services}
+                    value={formData.preferred_service_id}
+                    onSelect={(service) => onInputChange('preferred_service_id', service ? service.id.toString() : null)}
+                    placeholder="Buscar servicio..."
+                    renderSelected={(service) => service.name}
+                    renderItem={(service) => (
+                      <p className="font-medium">{service.name}</p>
+                    )}
                   />
                 </div>
 

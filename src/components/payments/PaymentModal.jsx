@@ -13,22 +13,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Calendar as CalendarIcon,
   DollarSign,
   CreditCard,
   Send,
   HelpCircle,
   User,
-  Search,
   Tag,
 } from "lucide-react";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import api from "@/lib/api";
+import { useToast } from "@/components/ui/use-toast";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -53,8 +48,10 @@ const PaymentModal = ({
   isManual = false,
   prefillData = {},
   clients = [],
-  services = [],
+  services: initialServices = [],
 }) => {
+  const { toast } = useToast();
+  const [localServices, setLocalServices] = useState(initialServices);
   const [formData, setFormData] = useState({
     date: new Date(),
     clientId: "",
@@ -92,8 +89,27 @@ const PaymentModal = ({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  useEffect(() => { setLocalServices(initialServices); }, [initialServices]);
+
+  const handleCreateService = async ({ name, price }) => {
+    try {
+      const newService = await api.createService({
+        name,
+        sale_price: price,
+        duration_min: 30,
+        category: 'Otro',
+        active: true,
+      });
+      setLocalServices(prev => [...prev, newService]);
+      handleServiceChange(newService.id.toString());
+      toast({ title: "Servicio creado", description: `"${name}" fue agregado.` });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  };
+
   const handleServiceChange = (serviceId) => {
-    const selectedService = services.find((s) => s.id.toString() === serviceId);
+    const selectedService = localServices.find((s) => s.id.toString() === serviceId);
     if (selectedService) {
       setFormData((prev) => ({
         ...prev,
@@ -183,24 +199,22 @@ const PaymentModal = ({
             <div>
               <Label htmlFor="service">Servicio</Label>
               {isManual ? (
-                <Select
-                  onValueChange={handleServiceChange}
+                <SearchableSelect
+                  id="service"
+                  items={localServices}
                   value={formData.serviceId?.toString()}
-                >
-                  <SelectTrigger id="service" className="mt-1">
-                    <SelectValue placeholder="Seleccionar servicio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem
-                        key={service.id}
-                        value={service.id.toString()}
-                      >
-                        {service?.name || 'Servicio'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onSelect={(service) => service && handleServiceChange(service.id.toString())}
+                  onCreateNew={handleCreateService}
+                  placeholder="Buscar servicio..."
+                  renderSelected={(service) => service.name}
+                  renderItem={(service) => (
+                    <div>
+                      <p className="font-medium">{service.name}</p>
+                      <p className="text-xs text-muted-foreground">${service.sale_price}</p>
+                    </div>
+                  )}
+                  className="mt-1"
+                />
               ) : (
                 <Input
                   value={prefillData.service || ""}
@@ -215,34 +229,20 @@ const PaymentModal = ({
           <div>
             <Label>Cliente</Label>
             {isManual ? (
-              <div className="space-y-2 mt-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Buscar cliente..."
-                    value={clientSearch}
-                    onChange={(e) => setClientSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                {clientSearch && filteredClients.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto space-y-1 border rounded-lg p-2">
-                    {filteredClients.map((client) => (
-                      <button
-                        key={client.id}
-                        type="button"
-                        onClick={() => handleClientSelect(client)}
-                        className="w-full text-left p-2 rounded hover:bg-accent"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <User className="w-4 h-4" />
-                          <span>{client?.name || 'Cliente'}</span>
-                        </div>
-                      </button>
-                    ))}
+              <SearchableSelect
+                items={clients}
+                value={formData.clientId?.toString()}
+                onSelect={(client) => client && handleClientSelect(client)}
+                placeholder="Buscar cliente..."
+                renderSelected={(client) => client.name}
+                renderItem={(client) => (
+                  <div className="flex items-center space-x-2">
+                    <User className="w-4 h-4" />
+                    <span>{client.name}</span>
                   </div>
                 )}
-              </div>
+                className="mt-1"
+              />
             ) : (
               <div className="flex items-center gap-2 mt-1 rounded-lg border bg-muted p-3 text-foreground">
                 <User className="w-4 h-4 text-muted-foreground" />

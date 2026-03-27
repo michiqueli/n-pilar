@@ -30,7 +30,6 @@ const Clientes = () => {
         name: '',
         phone: '',
         email: '',
-        notes: '',
         preferred_service_id: null
     });
 
@@ -96,7 +95,6 @@ const Clientes = () => {
                     name: formData.name,
                     phone: formData.phone,
                     email: formData.email,
-                    notes: formData.notes,
                     preferred_service_id: formData.preferred_service_id || null,
                 });
 
@@ -113,7 +111,6 @@ const Clientes = () => {
                     name: formData.name,
                     phone: formData.phone,
                     email: formData.email || null,
-                    notes: formData.notes,
                     preferred_service_id: formData.preferred_service_id || null,
                 });
 
@@ -135,14 +132,14 @@ const Clientes = () => {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', phone: '', email: '', notes: '', preferred_service_id: null });
+        setFormData({ name: '', phone: '', email: '', preferred_service_id: null });
         setSelectedClient(null);
         setIsModalOpen(false);
     };
 
     const openNewClientModal = () => {
         setSelectedClient(null);
-        setFormData({ name: '', phone: '', email: '', notes: '', preferred_service_id: null });
+        setFormData({ name: '', phone: '', email: '', preferred_service_id: null });
         setIsModalOpen(true);
     }
 
@@ -152,7 +149,6 @@ const Clientes = () => {
             name: client?.name,
             phone: client?.phone,
             email: client?.email || null,
-            notes: client?.notes || '',
             preferred_service_id: client?.preferred_service_id || null
         });
         setIsModalOpen(true);

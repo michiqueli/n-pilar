@@ -24,7 +24,6 @@ const FinancialIndicators = ({ financialSummary }) => {
             <h3 className="text-xl md:text-3xl font-bold text-foreground mb-1">
               ${financialSummary.totalIncome.toLocaleString()}
             </h3>
-            <p className="text-xs md:text-sm text-muted-foreground">Ingresos Totales</p>
           </div>
 
           <div className="text-center">
@@ -39,7 +38,6 @@ const FinancialIndicators = ({ financialSummary }) => {
             <h3 className="text-xl md:text-3xl font-bold text-foreground mb-1">
               ${financialSummary.totalExpenses.toLocaleString()}
             </h3>
-            <p className="text-xs md:text-sm text-muted-foreground">Gastos Totales</p>
           </div>
 
           <div className="text-center">
@@ -54,7 +52,6 @@ const FinancialIndicators = ({ financialSummary }) => {
             <h3 className="text-xl md:text-3xl font-bold text-foreground mb-1">
               ${financialSummary.netProfit.toLocaleString()}
             </h3>
-            <p className="text-xs md:text-sm text-muted-foreground">Ganancia Neta</p>
           </div>
         </div>
       </div>

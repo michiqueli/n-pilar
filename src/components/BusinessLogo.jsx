@@ -23,9 +23,7 @@ const BusinessLogo = ({ size = 'md', className }) => {
 
   if (config.logoUrl) {
     return (
-      <div className={cn(sizeClass, "rounded-lg overflow-hidden shadow-md flex-shrink-0", className)}>
-        <img src={config.logoUrl} alt={config.appName} className="w-full h-full object-cover" />
-      </div>
+      <img src={config.logoUrl} alt={config.appName} className={cn(sizeClass, "rounded-full object-cover flex-shrink-0 drop-shadow-md", className)} />
     );
   }
 

@@ -230,33 +230,6 @@ const Configuracion = () => {
           </Button>
         </div>
 
-        {/* Info del negocio */}
-        <div className="premium-card p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-foreground">Información del negocio</h2>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Nombre</span>
-              <span className="font-medium text-foreground">{config.appName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tipo de negocio</span>
-              <span className="font-medium text-foreground">{config.businessLabel}</span>
-            </div>
-            {config.businessSubtitle && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtítulo</span>
-                <span className="font-medium text-foreground">{config.businessSubtitle}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tenant</span>
-              <span className="font-medium text-foreground">{config.tenantSlug}</span>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground pt-2 border-t">
-            Para cambiar estos datos, modifica las variables de entorno (.env) del proyecto.
-          </p>
-        </div>
       </motion.div>
     </>
   );

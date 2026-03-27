@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet';
-import { ArrowLeft, Phone, Mail, MessageSquare, Edit, Calendar, Clock, User, Scissors, Info } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MessageSquare, Edit, Calendar, Clock, User, Scissors, Info, Plus } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { format, parseISO } from 'date-fns';
@@ -27,6 +28,37 @@ const ClientProfile = () => {
         notes: '',
         preferred_service_id: null
     });
+
+    // --- Estados para comentarios ---
+    const [showCommentInput, setShowCommentInput] = useState(false);
+    const [newComment, setNewComment] = useState('');
+
+    const parseComments = (notes) => {
+        if (!notes) return [];
+        try {
+            const parsed = JSON.parse(notes);
+            if (Array.isArray(parsed)) return parsed;
+        } catch {}
+        // Si es texto plano (legacy), lo convertimos en un comentario
+        return [{ text: notes, date: client?.created_at || new Date().toISOString() }];
+    };
+
+    const handleAddComment = async () => {
+        if (!newComment.trim()) return;
+        const comments = parseComments(client.notes);
+        comments.unshift({ text: newComment.trim(), date: new Date().toISOString() });
+        try {
+            const updatedClient = await api.updateClient(client.id, {
+                notes: JSON.stringify(comments),
+            });
+            setClient(updatedClient);
+            setNewComment('');
+            setShowCommentInput(false);
+            toast({ title: "Comentario agregado" });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    };
 
     useEffect(() => {
         const fetchClientData = async () => {
@@ -83,7 +115,6 @@ const ClientProfile = () => {
                 name: client?.name,
                 phone: client?.phone,
                 email: client?.email || '',
-                notes: client?.notes || '',
                 preferred_service_id: client?.preferred_service_id || null
             });
             setIsModalOpen(true);
@@ -117,7 +148,6 @@ const ClientProfile = () => {
                 name: formData.name,
                 phone: formData.phone,
                 email: formData.email,
-                notes: formData.notes,
             });
 
             setClient(updatedClient); // Actualizamos el perfil en la página al instante
@@ -254,10 +284,38 @@ const ClientProfile = () => {
                             </div>
                         </div>
                         <div className="premium-card p-6">
-                            <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2"><User className="w-5 h-5 text-primary"/> Notas del Barbero</h2>
-                            <p className="text-sm text-muted-foreground italic">
-                                {client.notes || "No hay notas personales para este cliente."}
-                            </p>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold text-foreground flex items-center gap-2"><MessageSquare className="w-5 h-5 text-primary"/> Comentarios</h2>
+                                <Button variant="outline" size="sm" onClick={() => setShowCommentInput(!showCommentInput)}>
+                                    <Plus className="w-4 h-4 mr-1" />Agregar
+                                </Button>
+                            </div>
+                            {showCommentInput && (
+                                <div className="space-y-2 mb-4">
+                                    <Textarea
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Escribe un comentario..."
+                                        rows={3}
+                                    />
+                                    <div className="flex gap-2 justify-end">
+                                        <Button variant="ghost" size="sm" onClick={() => { setShowCommentInput(false); setNewComment(''); }}>Cancelar</Button>
+                                        <Button variant="primary" size="sm" onClick={handleAddComment} disabled={!newComment.trim()}>Guardar</Button>
+                                    </div>
+                                </div>
+                            )}
+                            {parseComments(client.notes).length > 0 ? (
+                                <div className="space-y-3">
+                                    {parseComments(client.notes).map((comment, i) => (
+                                        <div key={i} className="p-3 bg-muted/50 rounded-lg border">
+                                            <p className="text-sm text-foreground">{comment.text}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">{format(parseISO(comment.date), "d 'de' MMMM yyyy, HH:mm", { locale: es })}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No hay comentarios para este cliente.</p>
+                            )}
                         </div>
                     </motion.div>
                 </div>

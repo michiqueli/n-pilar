@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Helmet } from 'react-helmet';
-import { Plus, Scissors, Search, X as XIcon, SlidersHorizontal, LayoutGrid, List } from 'lucide-react';
+import { Plus, Scissors, Search, X as XIcon, SlidersHorizontal, LayoutGrid, List, Tag, Pencil, Trash2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
@@ -31,23 +31,33 @@ const Productos = () => {
     const [showInactive, setShowInactive] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [serviceToDelete, setServiceToDelete] = useState(null);
+    const [dbCategories, setDbCategories] = useState([]);
+    const [showCategoryPanel, setShowCategoryPanel] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [editingCategoryId, setEditingCategoryId] = useState(null);
+    const [editingCategoryName, setEditingCategoryName] = useState('');
 
     const categories = useMemo(() => {
         const allCategories = new Set(['Todos']);
+        dbCategories.forEach(c => allCategories.add(c.name));
         services.forEach(s => {
-            if (s.active === !showInactive) {
+            if (s.active === !showInactive && s.category) {
                 allCategories.add(s.category);
             }
         });
         return Array.from(allCategories);
-    }, [services, showInactive]);
+    }, [services, showInactive, dbCategories]);
 
     useEffect(() => {
         const fetchServices = async () => {
             setLoading(true);
             try {
-                const data = await api.getServices();
+                const [data, cats] = await Promise.all([
+                    api.getServices(),
+                    api.getCategories(),
+                ]);
                 setServices(data || []);
+                setDbCategories(cats || []);
             } catch (error) {
                 toast({
                     variant: "destructive",
@@ -166,6 +176,40 @@ const Productos = () => {
         }
     };
 
+    const handleAddCategory = async () => {
+        if (!newCategoryName.trim()) return;
+        try {
+            const cat = await api.createCategory({ name: newCategoryName.trim() });
+            setDbCategories(prev => [...prev, cat]);
+            setNewCategoryName('');
+            toast({ title: "Categoría creada" });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    };
+
+    const handleUpdateCategory = async (id) => {
+        if (!editingCategoryName.trim()) return;
+        try {
+            const cat = await api.updateCategory(id, { name: editingCategoryName.trim() });
+            setDbCategories(prev => prev.map(c => c.id === id ? cat : c));
+            setEditingCategoryId(null);
+            toast({ title: "Categoría actualizada" });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    };
+
+    const handleDeleteCategory = async (id) => {
+        try {
+            await api.deleteCategory(id);
+            setDbCategories(prev => prev.filter(c => c.id !== id));
+            toast({ title: "Categoría eliminada" });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    };
+
     const EmptyState = () => (
         <motion.div
             className="text-center py-20 text-muted-foreground"
@@ -204,7 +248,7 @@ const Productos = () => {
             </Helmet>
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                {isModalOpen && <ServiceForm service={selectedService} onSave={handleSaveService} onClose={handleCloseModal} />}
+                {isModalOpen && <ServiceForm service={selectedService} onSave={handleSaveService} onClose={handleCloseModal} categories={dbCategories} />}
             </Dialog>
 
             <ConfirmationDialog
@@ -227,11 +271,76 @@ const Productos = () => {
                         <p className="text-muted-foreground mt-1">Gestiona tu oferta de servicios profesionales.</p>
                     </div>
 
-                    <Button onClick={() => handleOpenModal()} variant="primary" size="lg">
-                        <Plus className="w-5 h-5 mr-2" />
-                        Nuevo Servicio
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={() => setShowCategoryPanel(!showCategoryPanel)} variant="secondary" size="lg">
+                            <Tag className="w-5 h-5 mr-2" />
+                            Categorías
+                        </Button>
+                        <Button onClick={() => handleOpenModal()} variant="primary" size="lg">
+                            <Plus className="w-5 h-5 mr-2" />
+                            Nuevo Servicio
+                        </Button>
+                    </div>
                 </motion.div>
+
+                {showCategoryPanel && (
+                        <div className="premium-card p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-semibold text-foreground flex items-center gap-2"><Tag className="w-4 h-4" /> Categorías</h3>
+                                <Button variant="ghost" size="icon" onClick={() => setShowCategoryPanel(false)}><XIcon className="w-4 h-4" /></Button>
+                            </div>
+                            <div className="flex gap-2">
+                                <Input
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    placeholder="Nueva categoría..."
+                                    className="flex-1"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                                />
+                                <Button variant="primary" size="sm" onClick={handleAddCategory} disabled={!newCategoryName.trim()}>
+                                    <Plus className="w-4 h-4 mr-1" />Agregar
+                                </Button>
+                            </div>
+                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                                {dbCategories.map(cat => (
+                                    <div key={cat.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 group">
+                                        {editingCategoryId === cat.id ? (
+                                            <div className="flex gap-2 flex-1">
+                                                <Input
+                                                    value={editingCategoryName}
+                                                    onChange={(e) => setEditingCategoryName(e.target.value)}
+                                                    className="flex-1 h-8 text-sm"
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateCategory(cat.id)}
+                                                    autoFocus
+                                                />
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleUpdateCategory(cat.id)}>
+                                                    <Check className="w-3 h-3" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCategoryId(null)}>
+                                                    <XIcon className="w-3 h-3" />
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <span className="text-sm text-foreground">{cat.name}</span>
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}>
+                                                        <Pencil className="w-3 h-3" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteCategory(cat.id)}>
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                                {dbCategories.length === 0 && (
+                                    <p className="text-sm text-muted-foreground text-center py-2">No hay categorías. Crea la primera.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                 <motion.div
                     className="premium-card p-6"

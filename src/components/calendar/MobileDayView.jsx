@@ -6,8 +6,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { isSameDay, parseISO, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-const hours = Array.from({ length: 29 }, (_, i) => {
-    const totalMinutes = 8 * 60 + i * 30;
+const hours = Array.from({ length: 57 }, (_, i) => {
+    const totalMinutes = 8 * 60 + i * 15;
     const h = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
     const m = (totalMinutes % 60).toString().padStart(2, '0');
     return `${h}:${m}`;
@@ -32,8 +32,8 @@ const MobileDayView = ({
         
         return (
           <div key={hour} className="flex items-stretch space-x-3">
-            <div className="w-16 text-center text-muted-foreground font-medium text-sm pt-4">
-              {hour}
+            <div className="w-16 text-center text-muted-foreground font-medium text-sm pt-2">
+              {hourIndex % 2 === 0 ? hour : ''}
             </div>
             <div className="flex-1 border-l border-border pl-3">
               {appointment ? (
@@ -72,7 +72,7 @@ const MobileDayView = ({
                   <Button 
                     variant="ghost" 
                     className={cn(
-                      "w-full h-16 border-dashed border-2 transition-all duration-200",
+                      "w-full h-10 border-dashed border transition-all duration-200",
                       isDayToday 
                         ? "border-primary/20 hover:border-primary hover:bg-primary/10" 
                         : "border-muted/50 hover:border-primary hover:bg-primary/5"
@@ -85,7 +85,7 @@ const MobileDayView = ({
                     )} />
                   </Button>
                 ) : (
-                    <div className="h-16 flex items-center justify-center">
+                    <div className="h-10 flex items-center justify-center">
                         <Coffee className="w-5 h-5 text-muted-foreground/30" />
                     </div>
                 )

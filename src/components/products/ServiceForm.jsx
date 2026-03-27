@@ -22,7 +22,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { UploadCloud, Image as ImageIcon } from "lucide-react";
 import api from "@/lib/api";
 
-const ServiceForm = ({ service, onSave, onClose }) => {
+const ServiceForm = ({ service, onSave, onClose, categories = [] }) => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     name: "",
@@ -125,7 +125,7 @@ const ServiceForm = ({ service, onSave, onClose }) => {
   };
 
   return (
-    <DialogContent className="max-w-2xl top-12 left-[40%]">
+    <DialogContent className="max-w-lg mx-auto p-0 top-12 sm:left-[20%] left-[5%] fixed xl:top-12 xl:left-[35%]">
       <DialogHeader>
         <DialogTitle>
           {service ? "Editar Servicio" : "Nuevo Servicio"}
@@ -209,12 +209,15 @@ const ServiceForm = ({ service, onSave, onClose }) => {
               <SelectValue placeholder="Seleccionar categoría" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Cortes">Cortes de Pelo</SelectItem>
-              <SelectItem value="Barba">Corte y Arreglo de Barba</SelectItem>
-              <SelectItem value="Cejas">Diseño y Arreglo de Cejas</SelectItem>
-              <SelectItem value="Combos">Combos</SelectItem>
-              <SelectItem value="Adicionales">Servicios Adicionales</SelectItem>
-              <SelectItem value="Otro">Otro</SelectItem>
+              {categories.length > 0 ? (
+                categories.map(cat => (
+                  <SelectItem key={cat.id || cat.name} value={cat.name || cat}>
+                    {cat.name || cat}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="General">General</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>

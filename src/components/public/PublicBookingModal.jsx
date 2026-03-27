@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { format, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/components/ui/use-toast';
@@ -115,12 +115,20 @@ const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave, pres
                     <div className="py-4 space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="service">1. Elige el servicio</Label>
-                            <Select onValueChange={setSelectedServiceId} value={selectedServiceId}>
-                                <SelectTrigger id="service" className="w-full"><SelectValue placeholder="Selecciona un servicio..." /></SelectTrigger>
-                                <SelectContent>
-                                    {services.map(service => (<SelectItem key={service.id} value={service.id.toString()}>{service.name} - ${service.sale_price} ({service.duration_min} min)</SelectItem>))}
-                                </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                                id="service"
+                                items={services}
+                                value={selectedServiceId}
+                                onSelect={(service) => setSelectedServiceId(service ? service.id.toString() : '')}
+                                placeholder="Buscar servicio..."
+                                renderSelected={(service) => service.name}
+                                renderItem={(service) => (
+                                    <div>
+                                        <p className="font-medium">{service.name}</p>
+                                        <p className="text-xs text-muted-foreground">${service.sale_price} — {service.duration_min} min</p>
+                                    </div>
+                                )}
+                            />
                             {endTime && <p className="text-xs text-right text-muted-foreground">Finaliza aprox. a las {endTime}</p>}
                         </div>
                         <div className="space-y-2">

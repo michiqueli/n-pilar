@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { User, UserPlus, Calendar as CalendarIcon, AlertTriangle, Clock } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, addMinutes, parse, parseISO, startOfDay, getDay } from 'date-fns';
@@ -15,9 +15,11 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import TimePicker from '@/components/calendar/TimePicker';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import api from '@/lib/api';
 
-const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, services, appointments, availability }) => {
+const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, services: initialServices, appointments, availability }) => {
     const { toast } = useToast();
+    const [localServices, setLocalServices] = useState(initialServices || []);
     const [tab, setTab] = useState('existing');
     const [clientSearch, setClientSearch] = useState('');
     const [selectedClientId, setSelectedClientId] = useState('');
@@ -35,6 +37,25 @@ const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, service
     const [isClientListVisible, setIsClientListVisible] = useState(false);
     
     // --- CORRECCIÓN: Se eliminó el estado local `services` y su `useEffect` ---
+
+    useEffect(() => { setLocalServices(initialServices || []); }, [initialServices]);
+
+    const handleCreateService = async ({ name, price }) => {
+        try {
+            const newService = await api.createService({
+                name,
+                sale_price: price,
+                duration_min: 30,
+                category: 'Otro',
+                active: true,
+            });
+            setLocalServices(prev => [...prev, newService]);
+            setSelectedServiceId(newService.id.toString());
+            toast({ title: "Servicio creado", description: `"${name}" fue agregado.` });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    };
 
     const resetForm = () => {
         setTab('existing');
@@ -88,8 +109,8 @@ const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, service
     }, [clientSearch, clients, selectedClientId]);
     
     useEffect(() => {
-        if (selectedServiceId && selectedTime && selectedDate && services && services.length > 0 && availability) {
-            const service = services.find(s => s.id.toString() === selectedServiceId);
+        if (selectedServiceId && selectedTime && selectedDate && localServices && localServices.length > 0 && availability) {
+            const service = localServices.find(s => s.id.toString() === selectedServiceId);
             if (service) {
                 try {
                     const startTime = parse(selectedTime, 'HH:mm', selectedDate);
@@ -135,7 +156,7 @@ const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, service
         } else {
             setEndTime('');
         }
-    }, [selectedServiceId, selectedTime, selectedDate, services, appointments, availability]);
+    }, [selectedServiceId, selectedTime, selectedDate, localServices, appointments, availability]);
 
     const handleSave = (e) => {
         e.preventDefault();
@@ -179,7 +200,7 @@ const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, service
             return;
         }
         
-        const service = services.find(s => s.id.toString() === selectedServiceId);
+        const service = localServices.find(s => s.id.toString() === selectedServiceId);
         if (!service) {
             toast({ variant: 'destructive', title: 'Error', description: 'El servicio seleccionado no es válido.' });
             return;
@@ -278,25 +299,37 @@ const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, service
                             <TabsTrigger value="new" aria-label="Crear cliente nuevo"><UserPlus className="w-4 h-4 mr-2" />Nuevo</TabsTrigger>
                         </TabsList>
                         <TabsContent value="existing" className="space-y-4 pt-4">
-                            <div className="relative">
+                            <div>
                                 <Label htmlFor="client-search">Buscar cliente</Label>
-                                <Input id="client-search" placeholder="Escribe para buscar..." value={clientSearch} onChange={e => { setClientSearch(e.target.value); setSelectedClientId(''); }} onFocus={() => setIsClientListVisible(true)} onBlur={() => setTimeout(() => setIsClientListVisible(false), 150)} autoComplete="off" />
-                                {isClientListVisible && (
-                                    <div aria-live="polite" className="absolute z-20 w-full mt-1 bg-card border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                                        {filteredClients.length > 0 ? filteredClients.map(client => (
-                                            <div key={client.id} onMouseDown={() => { setSelectedClientId(client.id); setClientSearch(client.name); setIsClientListVisible(false); }}
-                                                 className={cn("p-3 cursor-pointer hover:bg-accent flex justify-between items-center", selectedClientId === client.id ? "bg-primary/10" : "")}>
-                                                <div>
-                                                    <p className="font-semibold">{client.name}</p>
-                                                    <p className="text-xs text-muted-foreground">{client.phone}</p>
-                                                </div>
-                                                {client.last_visit_at && <p className="text-xs text-muted-foreground">Última visita: {format(new Date(client.last_visit_at), 'dd/MM/yy')}</p>}
+                                <SearchableSelect
+                                    id="client-search"
+                                    items={clients}
+                                    value={selectedClientId}
+                                    onSelect={(client) => {
+                                        if (client) {
+                                            setSelectedClientId(client.id);
+                                            setClientSearch(client.name);
+                                        } else {
+                                            setSelectedClientId('');
+                                            setClientSearch('');
+                                        }
+                                    }}
+                                    placeholder="Buscar cliente..."
+                                    renderSelected={(client) => client.name}
+                                    renderItem={(client) => (
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="font-semibold">{client.name}</p>
+                                                <p className="text-xs text-muted-foreground">{client.phone}</p>
                                             </div>
-                                        )) : (
-                                            <p className="text-sm text-muted-foreground text-center p-4">No se encontraron clientes.</p>
-                                        )}
-                                    </div>
-                                )}
+                                            {client.last_visit_at && <p className="text-xs text-muted-foreground">Última visita: {format(new Date(client.last_visit_at), 'dd/MM/yy')}</p>}
+                                        </div>
+                                    )}
+                                    filterFn={(client, search) =>
+                                        client.name.toLowerCase().includes(search.toLowerCase()) ||
+                                        (client.phone && client.phone.includes(search))
+                                    }
+                                />
                             </div>
                         </TabsContent>
                         <TabsContent value="new" className="space-y-4 pt-4">
@@ -313,18 +346,21 @@ const AppointmentModal = ({ isOpen, onClose, modalData, onSave, clients, service
 
                     <div className="space-y-2 pt-2">
                         <Label htmlFor="service">Servicio (requerido)</Label>
-                        <Select onValueChange={setSelectedServiceId} value={selectedServiceId}>
-                            <SelectTrigger id="service" className="w-full">
-                                <SelectValue placeholder="Selecciona un servicio" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {services.map(service => (
-                                    <SelectItem key={service.id} value={service.id.toString()}>
-                                        {service.name} - ${service.sale_price} ({service.duration_min} min)
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                            id="service"
+                            items={localServices}
+                            value={selectedServiceId}
+                            onSelect={(service) => setSelectedServiceId(service ? service.id.toString() : '')}
+                            onCreateNew={handleCreateService}
+                            placeholder="Buscar servicio..."
+                            renderSelected={(service) => service.name}
+                            renderItem={(service) => (
+                                <div>
+                                    <p className="font-medium">{service.name}</p>
+                                    <p className="text-xs text-muted-foreground">${service.sale_price} — {service.duration_min} min</p>
+                                </div>
+                            )}
+                        />
                         {endTime && <p className="text-xs text-right text-muted-foreground">Finaliza aprox. a las {endTime}</p>}
                     </div>
                     

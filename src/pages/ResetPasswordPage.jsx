@@ -74,7 +74,7 @@ const ResetPasswordPage = () => {
                 >
                     <div className="bg-card/80 backdrop-blur-lg p-8 rounded-2xl shadow-2xl border border-white/10">
                         <div className="flex flex-col items-center mb-8">
-                            <BusinessLogo size="lg" className="mb-4 rounded-2xl" />
+                            <BusinessLogo size="lg" className="mb-4" />
                             <h2 className="text-center text-2xl font-bold tracking-tight text-foreground">
                                 Nueva contraseña
                             </h2>
