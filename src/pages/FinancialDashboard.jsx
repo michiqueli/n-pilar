@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
+import { Helmet } from "react-helmet";
 import { useToast } from "@/components/ui/use-toast";
 import { format, startOfDay, endOfDay, parseISO } from "date-fns";
 import { Dialog } from "@/components/ui/dialog";
@@ -14,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import api from "@/lib/api";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
+import config from "@/config";
 
 const FinancialDashboard = () => {
     const { toast } = useToast();
@@ -105,11 +107,12 @@ const FinancialDashboard = () => {
     const handleSaveTransaction = async (transactionData) => {
         try {
             if (editingTransaction && editingTransaction.id) {
+                const editDateStr = transactionData.date instanceof Date ? transactionData.date.toISOString() : transactionData.date;
                 if (editingTransaction.type === 'income') {
                     const data = await api.updatePayment(editingTransaction.id, {
                         client_id: transactionData.clientId, service_id: transactionData.serviceId,
                         amount: transactionData.amount, method: transactionData.paymentMethod,
-                        notes: transactionData.notes, payment_at: transactionData.date,
+                        notes: transactionData.notes, payment_at: editDateStr,
                     });
                     const updatedTx = { ...data, type: 'income', clientName: data.clients?.name || data.client?.name, service: data.services?.name || data.service?.name, date: data.payment_at, confirmed: true, clientId: data.client_id, serviceId: data.service_id };
                     setAllTransactions(prev => prev.map(t => t.id === editingTransaction.id ? updatedTx : t));
@@ -118,7 +121,7 @@ const FinancialDashboard = () => {
                     const data = await api.updateExpense(editingTransaction.id, {
                         description: transactionData.description,
                         amount: transactionData.amount,
-                        expense_date: transactionData.date,
+                        expense_date: editDateStr.split('T')[0],
                         notes: transactionData.notes,
                         category: transactionData.category,
                         payment_method: transactionData.paymentMethod,
@@ -128,11 +131,12 @@ const FinancialDashboard = () => {
                     toast({ title: "✅ Gasto Actualizado" });
                 }
             } else {
+                const dateStr = transactionData.date instanceof Date ? transactionData.date.toISOString() : transactionData.date;
                 if (transactionData.type === "income") {
                     const data = await api.createPayment({
                         client_id: transactionData.clientId, service_id: transactionData.serviceId,
                         amount: transactionData.amount, method: transactionData.paymentMethod,
-                        status: "COMPLETED", notes: transactionData.notes, payment_at: transactionData.date,
+                        status: "COMPLETED", notes: transactionData.notes, payment_at: dateStr,
                     });
                     const newTransaction = { id: data.id, type: "income", clientName: data.clients?.name || data.client?.name, service: data.services?.name || data.service?.name, amount: data.amount, paymentMethod: data.method, date: data.payment_at, confirmed: true, clientId: data.client_id, serviceId: data.service_id };
                     setAllTransactions((prev) => [newTransaction, ...prev]);
@@ -141,7 +145,7 @@ const FinancialDashboard = () => {
                     const data = await api.createExpense({
                         description: transactionData.description,
                         amount: transactionData.amount,
-                        expense_date: transactionData.date,
+                        expense_date: dateStr.split('T')[0],
                         notes: transactionData.notes,
                         category: transactionData.category,
                         payment_method: transactionData.paymentMethod,
@@ -222,6 +226,13 @@ const FinancialDashboard = () => {
 
     return (
         <>
+            <Helmet>
+                <title>{`Ingresos y Gastos - ${config.appName}`}</title>
+            </Helmet>
+            <div className="flex-1 mb-6">
+                <h1 className="text-3xl font-bold text-foreground">Ingresos y Gastos</h1>
+                <p className="text-muted-foreground mt-1">Control de movimientos financieros de tu negocio.</p>
+            </div>
             <FilterBar onApplyFilters={setFilters} onClearFilters={() => setFilters(null)} />
             <div className="space-y-6 pb-24 md:pb-0">
                 <div className="flex flex-col md:flex-row justify-between items-start gap-6">

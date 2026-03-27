@@ -11,11 +11,12 @@ import { Loader2, Phone, MessageSquare, CheckCircle, PartyPopper } from 'lucide-
 import { api } from '@/lib/api';
 import { APP_CONFIG } from '../../config';
 
-const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) => {
+const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave, preselectedServiceId }) => {
     const { toast } = useToast();
     const [step, setStep] = useState('details');
     const [selectedServiceId, setSelectedServiceId] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
+    const [countryCode, setCountryCode] = useState('+34');
     const [verificationCode, setVerificationCode] = useState('');
     const [endTime, setEndTime] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -24,8 +25,9 @@ const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) =>
     useEffect(() => {
         if (isOpen) {
             setStep('details');
-            setSelectedServiceId('');
+            setSelectedServiceId(preselectedServiceId || '');
             setPhoneNumber('');
+            setCountryCode('+34');
             setVerificationCode('');
             setEndTime('');
             setIsLoading(false);
@@ -51,7 +53,7 @@ const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) =>
         setError('');
 
         try {
-            await api.sendVerificationCode(`+54${phoneNumber}`, APP_CONFIG.tenantSlug);
+            await api.sendVerificationCode(`${countryCode}${phoneNumber}`, APP_CONFIG.tenantSlug);
             toast({ title: "Código Enviado", description: "Revisa tu teléfono para obtener el código de verificación." });
             setStep('verify');
         } catch (err) {
@@ -70,14 +72,16 @@ const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) =>
 
         try {
             const appointmentDetails = await api.verifyAndBook({
-                phone: `+54${phoneNumber}`,
+                phone: `${countryCode}${phoneNumber}`,
                 code: verificationCode,
-                serviceId: selectedServiceId,
-                appointmentAt: modalData.date.toISOString(),
-                hourIndex: modalData.hourIndex,
+                service_id: selectedServiceId,
+                appointment_date: format(modalData.date, 'yyyy-MM-dd'),
+                hour_index: modalData.hourIndex,
+                tenant_slug: APP_CONFIG.tenantSlug,
             });
             setStep('success');
             onSave(appointmentDetails);
+            setTimeout(() => onClose(), 2500);
         } catch (err) {
             console.error("Error al confirmar la cita:", err);
             setError(err.message || "El código es incorrecto o ha expirado.");
@@ -120,10 +124,30 @@ const PublicBookingModal = ({ isOpen, onClose, modalData, services, onSave }) =>
                             {endTime && <p className="text-xs text-right text-muted-foreground">Finaliza aprox. a las {endTime}</p>}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="phone">2. Ingresa tu teléfono (sin 0 y sin 15)</Label>
-                            <div className="relative">
-                                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input id="phone" type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="Ej: 2991234567" className="pl-10" />
+                            <Label htmlFor="phone">2. Tu número de teléfono</Label>
+                            <div className="flex gap-2">
+                                <select
+                                    value={countryCode}
+                                    onChange={(e) => setCountryCode(e.target.value)}
+                                    className="w-[110px] h-10 rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                >
+                                    <option value="+34">🇪🇸 +34</option>
+                                    <option value="+54">🇦🇷 +54</option>
+                                    <option value="+52">🇲🇽 +52</option>
+                                    <option value="+57">🇨🇴 +57</option>
+                                    <option value="+56">🇨🇱 +56</option>
+                                    <option value="+51">🇵🇪 +51</option>
+                                    <option value="+44">🇬🇧 +44</option>
+                                    <option value="+33">🇫🇷 +33</option>
+                                    <option value="+49">🇩🇪 +49</option>
+                                    <option value="+351">🇵🇹 +351</option>
+                                    <option value="+39">🇮🇹 +39</option>
+                                    <option value="+1">🇺🇸 +1</option>
+                                </select>
+                                <div className="relative flex-1">
+                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input id="phone" type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="Ej: 612345678" className="pl-10" />
+                                </div>
                             </div>
                         </div>
                         {error && <p className="text-sm text-destructive text-center">{error}</p>}

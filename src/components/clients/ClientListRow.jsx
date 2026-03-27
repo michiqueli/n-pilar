@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Mail, Eye, Edit, Calendar, Trash2, MoreVertical } from 'lucide-react';
+import { Phone, Mail, Eye, Edit, Calendar, Trash2, MoreVertical, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -40,9 +40,9 @@ const ClientListRow = ({ client, onViewProfile, onEdit, onScheduleAppointment, o
       <div className={`w-10 h-10 rounded-full ${avatar.color} flex items-center justify-center text-primary-foreground font-bold text-sm flex-shrink-0`}>
         {avatar.initials}
       </div>
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
         <div className="font-bold text-foreground group-hover:text-primary transition-colors">{client?.name}</div>
-        
+
         <div className="text-muted-foreground text-sm flex items-center gap-2">
             <Phone className="w-4 h-4 text-primary/70" />
             {client?.phone}
@@ -56,6 +56,14 @@ const ClientListRow = ({ client, onViewProfile, onEdit, onScheduleAppointment, o
         <div className="text-muted-foreground text-sm hidden md:flex items-center gap-2">
             <Calendar className="w-4 h-4 text-primary/70" />
             {getLastVisitText(client.lastVisit)}
+        </div>
+
+        <div className="text-sm hidden md:flex items-center gap-2">
+            {client.consent_status === 'accepted' ? (
+                <><ShieldCheck className="w-4 h-4 text-green-500" /><span className="text-green-600">Firmado</span></>
+            ) : (
+                <><ShieldAlert className="w-4 h-4 text-amber-500" /><span className="text-amber-600">Pendiente</span></>
+            )}
         </div>
       </div>
       <div className="flex items-center gap-1">

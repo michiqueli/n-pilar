@@ -1,37 +1,38 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
-import KScissorsIcon from '@/components/KScissorsIcon';
-import { Fingerprint, Mail, Lock } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react';
+import config from '@/config';
+import BusinessLogo from '@/components/BusinessLogo';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
-    const [isLoading, setIsLoading] = useState(false); // Estado para la carga
-    const { login, webAuthnLogin } = useAuth();
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { login } = useAuth();
     const navigate = useNavigate();
 
-    // --- CORRECCIÓN: La función ahora es `async` y usa `await` ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
+        setError('');
 
-        // 1. Esperamos a que la función `login` termine y nos devuelva `true` o `false`.
-        const success = await login(email, password, rememberMe);
-
-        // 2. Solo navegamos al dashboard si el inicio de sesión fue exitoso.
-        if (success) {
+        try {
+            await login(email, password);
             navigate('/');
+        } catch (err) {
+            setError(err.message || 'Credenciales incorrectas');
+        } finally {
+            setIsLoading(false);
         }
-
-        setIsLoading(false);
     };
 
     const handleFaceId = async () => {
@@ -41,11 +42,11 @@ const LoginPage = () => {
     return (
         <>
             <Helmet>
-                <title>Iniciar Sesión - N - Pilar</title>
+                <title>{`Iniciar Sesión - ${config.appName}`}</title>
             </Helmet>
             <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-secondary">
                 <div className="absolute inset-0 h-full w-full bg-cover bg-center z-0">
-                    <img alt="Modern and stylish barbershop interior" className="h-full w-full object-cover" src="https://images.unsplash.com/photo-1582483720544-4068701c073d" />
+                    <img alt="Professional salon interior" className="h-full w-full object-cover" src={config.bgImage} />
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
                 </div>
 
@@ -57,17 +58,12 @@ const LoginPage = () => {
                 >
                     <div className="bg-card/80 backdrop-blur-lg p-8 rounded-2xl shadow-2xl border border-white/10">
                         <div className="flex flex-col items-center mb-8">
-                            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-lg mb-4">
-                                <KScissorsIcon className="w-8 h-8 text-primary-foreground" />
-                            </div>
+                            <BusinessLogo size="xl" className="mb-4 rounded-2xl" />
                             <h2 className="text-center text-3xl font-bold tracking-tight text-foreground">
-                                Bienvenido de nuevo
+                                {config.appName}
                             </h2>
                             <p className="mt-2 text-center text-sm text-muted-foreground">
-                                ¿No tienes una cuenta?{' '}
-                                <Link to="/register" className="font-medium text-primary hover:underline">
-                                    Regístrate aquí
-                                </Link>
+                                Inicia sesión con tus credenciales
                             </p>
                         </div>
                         <form className="space-y-6" onSubmit={handleSubmit}>
@@ -107,6 +103,12 @@ const LoginPage = () => {
                                     </div>
                                 </div>
                             </div>
+                            {error && (
+                                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    {error}
+                                </div>
+                            )}
                             {/*}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center">
@@ -117,6 +119,11 @@ const LoginPage = () => {
                                 </div>
                             </div>
                             */}
+                            <div className="flex justify-end">
+                                <Link to="/forgot-password" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                                    ¿Olvidaste tu contraseña?
+                                </Link>
+                            </div>
                             <div>
                                 <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                                     {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}

@@ -17,6 +17,7 @@ const Clientes = () => {
     const { toast } = useToast();
     const navigate = useNavigate();
     const [clients, setClients] = useState([]);
+    const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState('last_visit_at');
@@ -52,8 +53,12 @@ const Clientes = () => {
         const fetchClients = async () => {
             setLoading(true);
             try {
-                const data = await api.getClients();
+                const [data, servicesData] = await Promise.all([
+                    api.getClients(),
+                    api.getActiveServices(),
+                ]);
                 setClients(data || []);
+                setServices(servicesData || []);
             } catch (error) {
                 toast({
                     variant: "destructive",
@@ -87,31 +92,36 @@ const Clientes = () => {
 
         try {
             if (selectedClient) {
-                const data = await api.updateClient(selectedClient.id, {
+                await api.updateClient(selectedClient.id, {
                     name: formData.name,
                     phone: formData.phone,
                     email: formData.email,
                     notes: formData.notes,
+                    preferred_service_id: formData.preferred_service_id || null,
                 });
 
-                setClients(prev => prev.map(client => client.id === selectedClient.id ? data : client));
+                // Refetch para traer la relación preferred_service completa
+                const refreshed = await api.getClients();
+                setClients(refreshed || []);
                 toast({
-                    title: "✅ Cliente Actualizado",
-                    description: `Los datos de ${data.name} se guardaron correctamente.`,
+                    title: "Cliente Actualizado",
+                    description: `Los datos de ${formData.name} se guardaron correctamente.`,
                 });
 
             } else {
-                const data = await api.createClient({
+                await api.createClient({
                     name: formData.name,
                     phone: formData.phone,
                     email: formData.email || null,
                     notes: formData.notes,
+                    preferred_service_id: formData.preferred_service_id || null,
                 });
 
-                setClients(prev => [...prev, data]);
+                const refreshed = await api.getClients();
+                setClients(refreshed || []);
                 toast({
-                    title: "🎉 Cliente Agregado",
-                    description: `${data.name} ahora forma parte de tu cartera.`,
+                    title: "Cliente Agregado",
+                    description: `${formData.name} ahora forma parte de tu cartera.`,
                 });
             }
             resetForm();
@@ -179,6 +189,16 @@ const Clientes = () => {
 
     const handleScheduleAppointment = (client) => {
         navigate('/calendario', { state: { newAppointmentClient: client }});
+    };
+
+    const handleSendConsent = async (client) => {
+        try {
+            await api.sendConsent(client.id);
+            setClients(prev => prev.map(c => c.id === client.id ? { ...c, consent_status: 'sent' } : c));
+            toast({ title: "Consentimiento enviado", description: `Se envió el email a ${client.email}` });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: error.message || "No se pudo enviar el consentimiento." });
+        }
     };
 
     const filteredAndSortedClients = clients
@@ -311,6 +331,7 @@ const Clientes = () => {
                                 onEdit={handleEdit}
                                 onScheduleAppointment={handleScheduleAppointment}
                                 onDelete={handleDelete}
+                                onSendConsent={handleSendConsent}
                             />
                         })}
                         </motion.div>
@@ -356,6 +377,7 @@ const Clientes = () => {
                 formData={formData}
                 onInputChange={handleInputChange}
                 onSubmit={handleSubmit}
+                services={services}
             />
         </>
     );

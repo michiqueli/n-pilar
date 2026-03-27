@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X } from 'lucide-react';
+import { X, SlidersHorizontal } from 'lucide-react';
 import { api } from '@/lib/api';
 import PeriodPicker from '../analytics/PeriodPicker';
 import dayjs from 'dayjs';
@@ -14,6 +14,7 @@ const expenseCategories = ['Productos', 'Alquiler', 'Suministros', 'Marketing', 
 const paymentMethods = ['Todos', 'Efectivo', 'Tarjeta', 'Transferencia', 'Otro'];
 
 const FilterBar = ({ onApplyFilters, onClearFilters }) => {
+    const [showFilters, setShowFilters] = useState(false);
     const [dateRange, setDateRange] = useState({
         from: dayjs().startOf('month').toDate(),
         to: dayjs().endOf('month').toDate(),
@@ -118,73 +119,79 @@ const FilterBar = ({ onApplyFilters, onClearFilters }) => {
             transition={{ duration: 0.5 }}
             className="p-4 rounded-lg bg-card border mb-6"
         >
-            <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-[1.5fr_1.5fr] xl:grid-cols-[1.75fr_1.25fr_1.25fr_1.25fr_1.25fr] gap-4 items-end">
-                <div >
-                    <Label>Rango de Fechas</Label>
-                    <PeriodPicker dateRange={dateRange} setDateRange={setDateRange}
-                    /></div>
-                <div>
-                    <Label>Tipo</Label>
-                    <Select value={type} onValueChange={setType}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Todos">Todos</SelectItem>
-                            <SelectItem value="income">Ingresos</SelectItem>
-                            <SelectItem value="expense">Gastos</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div>
-                    <Label>Categoría</Label>
-                    <Select value={category} onValueChange={setCategory}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div >
-                    <Label>Método de Pago</Label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            {paymentMethods.map(method => <SelectItem key={method} value={method}>{method}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <Label>Monto Mín.</Label>
-                        <Input type="number" placeholder="$" value={minAmount} onChange={e => setMinAmount(e.target.value)} className="mt-1" />
-                    </div>
-                    <div>
-                        <Label>Monto Máx.</Label>
-                        <Input type="number" placeholder="$" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} className="mt-1" />
-                    </div>
-                </div>
-            </div>
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/40">
-                <p className="text-sm font-medium text-muted-foreground mr-2">Atajos:</p>
-                {quickSelectOptions.map(opt => (
-                    <Button
-                        key={opt.value}
-                        variant="outline"
-                        size="sm"
-                        className="h-8"
-                        onClick={() => handleQuickSelect(opt.value)}
-                    >
-                        {opt.label}
-                    </Button>
-                ))}
-            </div>
-            <div className="flex justify-end mt-4 pt-4 border-t">
-                <Button variant="ghost" onClick={handleClear}>
-                    <X className="w-4 h-4 mr-2" />
-                    Limpiar Filtros
+            {/* Mobile toggle button - hidden on md and above */}
+            <div className="md:hidden">
+                <Button
+                    variant="outline"
+                    className="w-full justify-center gap-2"
+                    onClick={() => setShowFilters(!showFilters)}
+                >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    Filtros
                 </Button>
+            </div>
+
+            {/* Filter content - toggled on mobile, always visible on md+ */}
+            <div className={`${showFilters ? 'block' : 'hidden'} md:block`}>
+                <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-[1.5fr_1.5fr] xl:grid-cols-[1.75fr_1.25fr_1.25fr_1.25fr_1.25fr] gap-4 items-end mt-4 md:mt-0">
+                    <div>
+                        <Label>Rango de Fechas</Label>
+                        <PeriodPicker
+                            dateRange={dateRange}
+                            setDateRange={setDateRange}
+                            quickSelectOptions={quickSelectOptions}
+                            onQuickSelect={handleQuickSelect}
+                        />
+                    </div>
+                    <div>
+                        <Label>Tipo</Label>
+                        <Select value={type} onValueChange={setType}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Todos">Todos</SelectItem>
+                                <SelectItem value="income">Ingresos</SelectItem>
+                                <SelectItem value="expense">Gastos</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <Label>Categoría</Label>
+                        <Select value={category} onValueChange={setCategory}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {categories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div >
+                        <Label>Método de Pago</Label>
+                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {paymentMethods.map(method => <SelectItem key={method} value={method}>{method}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <Label>Monto Mín.</Label>
+                            <Input type="number" placeholder="$" value={minAmount} onChange={e => setMinAmount(e.target.value)} className="mt-1" />
+                        </div>
+                        <div>
+                            <Label>Monto Máx.</Label>
+                            <Input type="number" placeholder="$" value={maxAmount} onChange={e => setMaxAmount(e.target.value)} className="mt-1" />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex justify-end mt-4 pt-4 border-t">
+                    <Button variant="ghost" onClick={handleClear}>
+                        <X className="w-4 h-4 mr-2" />
+                        Limpiar Filtros
+                    </Button>
+                </div>
             </div>
             
         </motion.div>

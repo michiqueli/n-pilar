@@ -10,6 +10,7 @@ import PaymentModal from '@/components/payments/PaymentModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, parseISO, startOfDay, endOfDay, addMinutes } from 'date-fns';
 import { api } from '@/lib/api';
+import config from '@/config';
 import 'swiper/css';
 import 'swiper/css/navigation';
 
@@ -24,7 +25,9 @@ const ClientCard = ({ title, appointment, onRegisterPayment, onWhatsApp, onViewP
         );
     }
 
-    const { clients: client, services: service, appointment_at, status } = appointment;
+    const client = appointment.client || appointment.clients;
+    const service = appointment.service || appointment.services;
+    const { appointment_at, status } = appointment;
     const isPaid = status === 'PAID';
 
     return (
@@ -150,7 +153,7 @@ const ClientCarousel = () => {
         try {
             await api.createPayment({
                 appointment_id: selectedAppointment.id,
-                client_id: selectedAppointment.clients.id,
+                client_id: selectedAppointment.client.id,
                 amount: paymentData.amount,
                 method: paymentData.paymentMethod,
                 status: 'COMPLETED',
@@ -167,7 +170,7 @@ const ClientCarousel = () => {
             setPaymentModalOpen(false);
             toast({
                 title: '✅ Pago Registrado',
-                description: `El pago de ${selectedAppointment.clients?.name} se ha guardado con éxito.`,
+                description: `El pago de ${selectedAppointment.client?.name} se ha guardado con éxito.`,
             });
         } catch (error) {
             toast({
@@ -181,7 +184,7 @@ const ClientCarousel = () => {
     const handleWhatsApp = (client) => {
         if (client && client?.phone) {
             const cleanPhoneNumber = client?.phone.replace(/[^0-9]/g, '');
-            const message = encodeURIComponent(`Hola ${client?.name}, un saludo desde Skin Hair Studio PILAR!`);
+            const message = encodeURIComponent(`Hola ${client?.name}, un saludo desde ${config.appName}!`);
             window.open(`https://wa.me/${cleanPhoneNumber}?text=${message}`, '_blank');
         } else {
             toast({
@@ -242,7 +245,7 @@ const ClientCarousel = () => {
                     isManual={false}
                     prefillData={{
                         client: selectedAppointment?.clients ?? null,
-                        service: selectedAppointment?.services?.name ?? null,
+                        service: selectedAppointment?.service?.name ?? null,
                         amount: selectedAppointment?.price_at_time ?? null,
                     }}
                 />

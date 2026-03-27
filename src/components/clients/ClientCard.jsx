@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Mail, Scissors, Star, Clock, Eye, Edit, Calendar, Trash2 } from 'lucide-react';
+import { Phone, Mail, Star, Eye, Edit, Calendar, Trash2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -14,7 +14,7 @@ import { MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
-const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointment, onDelete, viewMode }) => {
+const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointment, onDelete, onSendConsent, viewMode }) => {
   const getClientAvatar = (name) => {
     const initials = name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     const colors = [
@@ -154,6 +154,11 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
               <DropdownMenuItem onClick={() => onScheduleAppointment(client)}>
                 <Calendar className="w-4 h-4 mr-2" /> Agendar Cita
               </DropdownMenuItem>
+              {!client.consent_status === 'accepted' && client.email && onSendConsent && (
+                <DropdownMenuItem onClick={() => onSendConsent(client)}>
+                  <ShieldAlert className="w-4 h-4 mr-2" /> Enviar Consentimiento
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => onDelete(client.id)} className="text-destructive">
                 <Trash2 className="w-4 h-4 mr-2" /> Eliminar
               </DropdownMenuItem>
@@ -177,18 +182,27 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
             )}
 
             <div className="flex items-center text-muted-foreground">
-              <Scissors className="w-4 h-4 mr-3 text-primary" />
-              <span>Último corte: {client.lastVisit ? format(new Date(client.lastVisit), 'dd/MM/yyyy') : 'Nunca'}</span>
+              <Calendar className="w-4 h-4 mr-3 text-primary" />
+              <span>Fecha última visita: {client.lastVisit ? format(new Date(client.lastVisit), 'dd/MM/yyyy') : 'Nunca'}</span>
             </div>
 
             <div className="flex items-center text-muted-foreground">
               <Star className="w-4 h-4 mr-3 text-primary" />
-              <span>Servicio habitual: {client.preferredService}</span>
+              <span>Servicio habitual: {client.preferred_service?.name || 'Sin definir'}</span>
             </div>
 
             <div className="flex items-center text-muted-foreground">
-              <Clock className="w-4 h-4 mr-3 text-primary" />
-              <span>Última visita: {getLastVisitText(client.lastVisit)}</span>
+              {client.consent_status === 'accepted' ? (
+                <>
+                  <ShieldCheck className="w-4 h-4 mr-3 text-green-500" />
+                  <span className="text-green-600">Consentimiento firmado</span>
+                </>
+              ) : (
+                <>
+                  <ShieldAlert className="w-4 h-4 mr-3 text-amber-500" />
+                  <span className="text-amber-600">Consentimiento pendiente</span>
+                </>
+              )}
             </div>
           </div>
 

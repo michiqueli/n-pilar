@@ -236,6 +236,27 @@ class ApiClient {
     return this.request(`/expenses/${id}`, { method: 'DELETE' });
   }
 
+  // Upload
+  async uploadFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const url = `${this.baseUrl}/upload`;
+    const headers = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || 'Error al subir archivo');
+    }
+    return response.json();
+  }
+
   // Schedules
   getWorkSchedules() {
     return this.request('/schedules/work');
@@ -296,6 +317,38 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  forgotPassword(email, tenant_slug) {
+    return this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, tenant_slug }),
+    });
+  }
+
+  resetPassword(token, new_password) {
+    return this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password }),
+    });
+  }
+
+  sendConsent(client_id) {
+    return this.request('/consent/send', {
+      method: 'POST',
+      body: JSON.stringify({ client_id }),
+    });
+  }
+
+  acceptConsent(token) {
+    return this.request('/consent/accept', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  getConsentStatus(client_id) {
+    return this.request(`/consent/status?client_id=${client_id}`);
   }
 }
 

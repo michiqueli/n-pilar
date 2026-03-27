@@ -10,7 +10,6 @@ import {
     PieChart,
     TrendingUp,
     Download,
-    Wallet
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,6 @@ import PeriodPicker from '@/components/analytics/PeriodPicker';
 import SummaryTab from '@/components/analytics/SummaryTab';
 import ServicesTab from '@/components/analytics/ServicesTab';
 import HistoricTab from '@/components/analytics/HistoricTab';
-import FinancialDashboard from '@/pages/FinancialDashboard';
 import api from '@/lib/api';
 import config from '@/config';
 
@@ -317,36 +315,22 @@ const Analitica = () => {
                         <h1 className="text-3xl font-bold text-foreground">Análisis del Negocio</h1>
                         <p className="text-muted-foreground mt-1">Tus insights para tomar decisiones inteligentes.</p>
                     </div>
-                    {activeTab !== 'caja' && (
-                        <>
-                            <div className="grid grid-col-1 items-center lg:justify-end lg:items-end gap-2 w-1/2 justify-center lg:grid-cols-[0.5fr_0.5fr]">
-                                <DayFilterDropdown selectedDays={selectedDays} setSelectedDays={setSelectedDays} />
-                                <PeriodPicker dateRange={dateRange} setDateRange={setDateRange} varianr='primary'/>
-                            </div>
-                            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/40">
-                                <p className="text-sm font-medium text-muted-foreground mr-2">Atajos:</p>
-                                {quickSelectOptions.map(opt => (
-                                    <Button
-                                        key={opt.value}
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8"
-                                        onClick={() => handleQuickSelect(opt.value)}
-                                    >
-                                        {opt.label}
-                                    </Button>
-                                ))}
-                            </div>
-                        </>
-                    )}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
+                        <DayFilterDropdown selectedDays={selectedDays} setSelectedDays={setSelectedDays} />
+                        <PeriodPicker
+                            dateRange={dateRange}
+                            setDateRange={setDateRange}
+                            quickSelectOptions={quickSelectOptions}
+                            onQuickSelect={handleQuickSelect}
+                        />
+                    </div>
                 </motion.div>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="resumen"><BarChart2 className="w-4 h-4 mr-2" />Resumen</TabsTrigger>
                         <TabsTrigger value="servicios"><PieChart className="w-4 h-4 mr-2" />Servicios</TabsTrigger>
                         <TabsTrigger value="historico"><TrendingUp className="w-4 h-4 mr-2" />Tendencias</TabsTrigger>
-                        <TabsTrigger value="caja"><Wallet className="w-4 h-4 mr-2" />Caja/Finanzas</TabsTrigger>
                     </TabsList>
 
                     <div className="mt-4">
@@ -359,7 +343,6 @@ const Analitica = () => {
                         )}
                         {activeTab === 'servicios' && <ServicesTab analyticsData={analyticsData} />}
                         {activeTab === 'historico' && <HistoricTab analyticsData={analyticsData} />}
-                        {activeTab === 'caja' && <FinancialDashboard />}
                     </div>
                 </Tabs>
             </div>

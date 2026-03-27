@@ -7,13 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ClientForm = ({ 
-  isOpen, 
-  onClose, 
-  selectedClient, 
-  formData, 
-  onInputChange, 
-  onSubmit 
+const ClientForm = ({
+  isOpen,
+  onClose,
+  selectedClient,
+  formData,
+  onInputChange,
+  onSubmit,
+  services = [],
 }) => {
   return (
     <AnimatePresence>
@@ -31,7 +32,7 @@ const ClientForm = ({
                   Completa los datos para añadir o actualizar un cliente en tu cartera.
                 </DialogDescription>
               </DialogHeader>
-              
+
               <form onSubmit={onSubmit} className="space-y-4 px-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -48,9 +49,9 @@ const ClientForm = ({
                     <Label htmlFor="phone">Teléfono *</Label>
                     <Input
                       id="phone"
-                      value={formData.phone|| null}
+                      value={formData.phone || ''}
                       onChange={(e) => onInputChange('phone', e.target.value)}
-                      placeholder="+54 9 11 1234-5678"
+                      placeholder="+34 612 345 678"
                       required
                     />
                   </div>
@@ -61,7 +62,7 @@ const ClientForm = ({
                   <Input
                     id="email"
                     type="email"
-                    value={formData.email}
+                    value={formData.email || ''}
                     onChange={(e) => onInputChange('email', e.target.value)}
                     placeholder="cliente@email.com"
                   />
@@ -69,16 +70,20 @@ const ClientForm = ({
 
                 <div>
                   <Label>Servicio Preferido</Label>
-                  <Select onValueChange={(value) => onInputChange('preferredService', value)} value={formData.preferredService}>
+                  <Select
+                    onValueChange={(value) => onInputChange('preferred_service_id', value === 'none' ? null : value)}
+                    value={formData.preferred_service_id || 'none'}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar servicio" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Corte">Solo Corte</SelectItem>
-                      <SelectItem value="Corte + Barba">Corte + Barba</SelectItem>
-                      <SelectItem value="Barba">Solo Barba</SelectItem>
-                      <SelectItem value="Servicio Completo">Servicio Completo</SelectItem>
-                      <SelectItem value="Cejas">Arreglo de Cejas</SelectItem>
+                      <SelectItem value="none">Sin definir</SelectItem>
+                      {services.map(service => (
+                        <SelectItem key={service.id} value={service.id.toString()}>
+                          {service.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -87,9 +92,9 @@ const ClientForm = ({
                   <Label htmlFor="notes">Notas y Preferencias</Label>
                   <Textarea
                     id="notes"
-                    value={formData.notes}
+                    value={formData.notes || ''}
                     onChange={(e) => onInputChange('notes', e.target.value)}
-                    placeholder="Alergias, tipo de corte favorito, productos usados, etc."
+                    placeholder="Alergias, preferencias, productos usados, etc."
                   />
                 </div>
 

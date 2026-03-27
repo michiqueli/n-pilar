@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { UploadCloud, Image as ImageIcon } from "lucide-react";
-// Image upload removed - no storage endpoint in API yet
+import api from "@/lib/api";
 
 const ServiceForm = ({ service, onSave, onClose }) => {
   const { toast } = useToast();
@@ -97,11 +97,9 @@ const ServiceForm = ({ service, onSave, onClose }) => {
     try {
       let finalImageUrl = formData.image_url;
 
-      // TODO: Image upload not yet supported via API - use image URL directly for now
       if (imageFile) {
-        // Image file selected but upload endpoint not available yet
-        // Keep the preview URL for local display; actual upload requires backend storage endpoint
-        console.warn("Image upload not yet supported via API. Image will not be persisted.");
+        const result = await api.uploadFile(imageFile);
+        finalImageUrl = result.url;
       }
 
       const dataToSave = {

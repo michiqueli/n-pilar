@@ -101,7 +101,7 @@ const AvailabilityModal = ({ isOpen, onClose, availability, onSave, onDelete }) 
         if (tab === 'default') {
             onSave({
                 type: 'full_update',
-                data: localSchedule
+                data: { ...localSchedule, default: defaultHours }
             });
             return;
         }

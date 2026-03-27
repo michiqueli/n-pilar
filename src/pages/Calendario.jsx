@@ -256,16 +256,22 @@ const Calendario = () => {
                 client_id: clientId,
                 service_id: data.details.serviceId,
                 appointment_at: appointmentTimestamp,
-                status: 'SCHEDULED',
-                price_at_time: selectedService.sale_price,
-                duration_at_time_minutes: selectedService.duration_min,
+                price_at_time: Number(selectedService.sale_price),
+                duration_at_time_minutes: Number(selectedService.duration_min),
                 notes: data.details.notes,
             };
 
             const insertedAppointment = await api.createAppointment(newAppointmentForDB);
 
-            const durationInSlots = Math.ceil((insertedAppointment.services?.duration_min || insertedAppointment.service?.duration_min || selectedService.duration_min || 15) / 15);
-            const newAppointmentForState = { ...insertedAppointment, hourIndex: data.hourIndex, durationInSlots };
+            const clientObj = clients.find(c => c.id === clientId);
+            const durationInSlots = Math.ceil((selectedService.duration_min || 15) / 15);
+            const newAppointmentForState = {
+                ...insertedAppointment,
+                client: clientObj || { id: clientId, name: clientName },
+                service: selectedService,
+                hourIndex: data.hourIndex,
+                durationInSlots,
+            };
             setAppointments(prevAppointments => [...prevAppointments, newAppointmentForState]);
 
             setPreselectedClient(null);

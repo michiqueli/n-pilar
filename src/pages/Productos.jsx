@@ -102,11 +102,11 @@ const Productos = () => {
             const { id, ...dataToSave } = serviceData;
             if (id) {
                 const data = await api.updateService(id, dataToSave);
-                setServices(services.map(s => s.id === data.id ? data : s));
+                setServices(prev => prev.map(s => s.id === data.id ? data : s));
                 toast({ title: "✅ Servicio Actualizado" });
             } else {
                 const data = await api.createService(dataToSave);
-                setServices([...services, data]);
+                setServices(prev => [...prev, data]);
                 toast({ title: "🎉 Servicio Agregado" });
             }
             handleCloseModal();
@@ -223,8 +223,8 @@ const Productos = () => {
                     transition={{ duration: 0.5 }}
                 >
                     <div>
-                        <h1 className="text-3xl font-bold text-foreground mb-1">Catálogo de Servicios</h1>
-                        <p className="text-muted-foreground text-lg">Gestiona tu oferta de servicios profesionales.</p>
+                        <h1 className="text-3xl font-bold text-foreground">Servicios Ofrecidos</h1>
+                        <p className="text-muted-foreground mt-1">Gestiona tu oferta de servicios profesionales.</p>
                     </div>
 
                     <Button onClick={() => handleOpenModal()} variant="primary" size="lg">

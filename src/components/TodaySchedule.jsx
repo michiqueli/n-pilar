@@ -60,8 +60,8 @@ const TodaySchedule = () => {
             schedule.push({
                 ...app, // Incluimos todos los datos de la cita
                 time: format(parseISO(app.appointment_at), 'HH:mm'),
-                client: app.clients?.name || 'Cliente',
-                service: app.services?.name || 'Servicio',
+                client: app.client?.name || app.clients?.name || 'Cliente',
+                service: app.service?.name || app.services?.name || 'Servicio',
                 status: 'confirmada',
                 price: app.price_at_time,
                 isFreeSlot: false,
@@ -102,9 +102,11 @@ const TodaySchedule = () => {
 
     // --- NUEVO: Lógica para enviar recordatorio por WhatsApp ---
     const handleSendReminder = async (appointment) => {
-        if (appointment.clients && appointment.clients?.phone) {
-            const cleanPhoneNumber = appointment.clients?.phone.replace(/[^0-9]/g, '');
-            const message = encodeURIComponent(`¡Hola ${appointment?.clients?.name}! Te recordamos tu turno para un servicio de "${appointment?.services?.name}" hoy a las ${format(parseISO(appointment.appointment_at), 'HH:mm')}hs. ¡Te esperamos en Skin Hair Studio PILAR!`);
+        const client = appointment.client || appointment.clients;
+        const service = appointment.service || appointment.services;
+        if (client && client?.phone) {
+            const cleanPhoneNumber = client?.phone.replace(/[^0-9]/g, '');
+            const message = encodeURIComponent(`¡Hola ${client?.name}! Te recordamos tu turno para "${service?.name}" hoy a las ${format(parseISO(appointment.appointment_at), 'HH:mm')}hs.`);
             window.open(`https://wa.me/${cleanPhoneNumber}?text=${message}`, '_blank');
 
             // Actualizamos la base de datos para marcar el recordatorio como enviado
@@ -179,9 +181,9 @@ const TodaySchedule = () => {
             
             const newAppointmentForDB = {
                 client_id: clientId, service_id: data.details.serviceId,
-                appointment_at: appointmentTimestamp, status: 'SCHEDULED',
-                price_at_time: selectedService.sale_price,
-                duration_at_time_minutes: selectedService.duration_min,
+                appointment_at: appointmentTimestamp,
+                price_at_time: Number(selectedService.sale_price),
+                duration_at_time_minutes: Number(selectedService.duration_min),
                 notes: data.details.notes,
             };
 

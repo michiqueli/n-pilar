@@ -14,12 +14,18 @@ import Clientes from "@/pages/Clientes";
 import ClientProfile from "@/pages/ClientProfile";
 import Analitica from "@/pages/Analitica";
 import Productos from "@/pages/Productos";
+import FinancialDashboard from "@/pages/FinancialDashboard";
+import Configuracion from "@/pages/Configuracion";
 import LoginPage from "@/pages/LoginPage";
-import RegisterPage from "@/pages/RegisterPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import PublicBookingPage from './pages/public/PublicBookingPage';
+import ConsentPage from './pages/public/ConsentPage';
+import config from '@/config';
 
 function App() {
   const ProtectedRoute = ({ children }) => {
@@ -35,12 +41,12 @@ function App() {
   };
 
   return (
-    <>
+    <ThemeProvider>
       <Helmet>
-        <title>N - Pilar | El asistente del barbero</title>
+        <title>{config.businessSubtitle ? `${config.appName} | ${config.businessSubtitle}` : config.appName}</title>
         <meta
           name="description"
-          content="Sistema de gestión profesional para barberías y negocios. Gestiona citas, clientes, analítica y contabilidad."
+          content={`Sistema de gestión profesional. Gestiona citas, clientes, analítica y contabilidad.`}
         />
       </Helmet>
       <Router>
@@ -49,8 +55,10 @@ function App() {
             <LocalizationProvider dateAdapter={AdapterDayjs}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/reservar" element={<PublicBookingPage />} />
+              <Route path="/consent" element={<ConsentPage />} />
               <Route
                 path="/*"
                 element={
@@ -66,6 +74,8 @@ function App() {
                         />
                         <Route path="/analitica" element={<Analitica />} />
                         <Route path="/productos" element={<Productos />} />
+                        <Route path="/caja" element={<FinancialDashboard />} />
+                        <Route path="/configuracion" element={<Configuracion />} />
                         <Route path="*" element={<Navigate to="/" />} />
                       </Routes>
                     </Layout>
@@ -78,7 +88,7 @@ function App() {
           </TooltipProvider>
         </AuthProvider>
       </Router>
-    </>
+    </ThemeProvider>
   );
 }
 

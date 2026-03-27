@@ -33,7 +33,10 @@ const AgendaOverview = () => {
                 const totalAppointments = todaysAppointments.filter(a => a.status !== 'CANCELLED').length;
                 const cancelledToday = todaysAppointments.filter(a => a.status === 'CANCELLED').length;
                 const newClients = todaysAppointments
-                    .filter(a => a.status !== 'CANCELLED' && a.clients && a.clients.total_visits <= 1)
+                    .filter(a => {
+                        const client = a.client || a.clients;
+                        return a.status !== 'CANCELLED' && client && client.total_visits <= 1;
+                    })
                     .length;
 
                 // --- CORRECCIÓN: Lógica para formatear el tiempo libre ---

@@ -28,18 +28,9 @@ const Header = ({ toggleSidebar, isMobile }) => {
                         <Menu className="w-5 h-5" />
                     </Button>
 
-                    <div className="hidden sm:block">
-                        <h2 className="text-lg font-bold text-foreground tracking-tight">
-                            Panel de Control
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                            Gestión de tu negocio
-                        </p>
-                    </div>
-
                     <div className="block sm:hidden">
                         <h2 className="text-lg font-bold text-foreground tracking-tight">
-                            N - Pilar
+                            Cristal Aine
                         </h2>
                     </div>
                 </div>
