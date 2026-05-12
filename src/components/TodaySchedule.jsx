@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, CheckCircle, MessageSquare, PlusCircle, Banknote } from 'lucide-react';
+import { Clock, CheckCircle, MessageSquare, PlusCircle, Banknote, Send, Loader2, XCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import AppointmentModal from '@/components/calendar/AppointmentModal';
@@ -58,11 +58,10 @@ const TodaySchedule = () => {
 
         appointments.forEach(app => {
             schedule.push({
-                ...app, // Incluimos todos los datos de la cita
+                ...app,
                 time: format(parseISO(app.appointment_at), 'HH:mm'),
-                client: app.client?.name || app.clients?.name || 'Cliente',
-                service: app.service?.name || app.services?.name || 'Servicio',
-                status: 'confirmada',
+                clientName: app.client?.name || app.clients?.name || 'Cliente',
+                serviceName: app.service?.name || app.services?.name || 'Servicio',
                 price: app.price_at_time,
                 isFreeSlot: false,
             });
@@ -100,41 +99,38 @@ const TodaySchedule = () => {
         return schedule.sort((a, b) => a.time.localeCompare(b.time));
     }, [appointments, workSchedules]);
 
-    // --- NUEVO: Lógica para enviar recordatorio por WhatsApp ---
-    const handleSendReminder = async (appointment) => {
-        const client = appointment.client || appointment.clients;
-        const service = appointment.service || appointment.services;
-        if (client && client?.phone) {
-            const cleanPhoneNumber = client?.phone.replace(/[^0-9]/g, '');
-            const message = encodeURIComponent(`¡Hola ${client?.name}! Te recordamos tu turno para "${service?.name}" hoy a las ${format(parseISO(appointment.appointment_at), 'HH:mm')}hs.`);
-            window.open(`https://wa.me/${cleanPhoneNumber}?text=${message}`, '_blank');
+    const [sendingReminder, setSendingReminder] = useState(null);
 
-            // Actualizamos la base de datos para marcar el recordatorio como enviado
-            try {
-                await api.updateAppointment(appointment.id, { reminder_sent: true });
-                // Actualizamos el estado local para que la UI cambie al instante
-                setAppointments(prev => prev.map(apt =>
-                    apt.id === appointment.id ? { ...apt, reminder_sent: true } : apt
-                ));
-                toast({ title: "📱 Recordatorio Enviado", description: "Se ha abierto WhatsApp para enviar el mensaje." });
-            } catch (error) {
-                toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el estado del recordatorio." });
-            }
-        } else {
-            toast({
-                title: '⚠️ Sin número de teléfono',
-                description: 'Este cliente no tiene un número de WhatsApp guardado.',
-                variant: 'destructive'
-            });
+    // Mapa de estados para badges visuales
+    const statusConfig = {
+        SCHEDULED: { label: 'Pendiente', className: 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30', icon: Clock },
+        REMINDER_SENT: { label: 'Esperando respuesta', className: 'bg-blue-500/20 text-blue-600 border-blue-500/30', icon: MessageSquare },
+        CONFIRMED: { label: 'Confirmado', className: 'bg-green-500/20 text-green-600 border-green-500/30', icon: CheckCircle },
+        COMPLETED: { label: 'Completado', className: 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30', icon: CheckCircle },
+        PAID: { label: 'Pagado', className: 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30', icon: CheckCircle },
+        CANCELLED: { label: 'Cancelado', className: 'bg-red-500/20 text-red-600 border-red-500/30', icon: XCircle },
+    };
+
+    // Enviar recordatorio por WhatsApp via API de Twilio
+    const handleSendReminder = async (appointment) => {
+        if (sendingReminder) return;
+        setSendingReminder(appointment.id);
+        try {
+            await api.sendAppointmentReminder(appointment.id);
+            setAppointments(prev => prev.map(apt =>
+                apt.id === appointment.id ? { ...apt, status: 'REMINDER_SENT' } : apt
+            ));
+            toast({ title: 'Recordatorio enviado ✅', description: `Se envió el recordatorio por WhatsApp a ${appointment.clientName || appointment.client?.name}.` });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error al enviar recordatorio', description: error.message });
+        } finally {
+            setSendingReminder(null);
         }
     };
 
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'confirmada': return <CheckCircle className="w-5 h-5 text-success" />;
-            case 'libre': return <PlusCircle className="w-5 h-5 text-muted-foreground" />;
-            default: return <Clock className="w-5 h-5 text-warning" />;
-        }
+    // Determina si se puede enviar recordatorio
+    const canSendReminder = (appointment) => {
+        return appointment.status === 'SCHEDULED' && new Date(appointment.appointment_at) > new Date();
     };
 
     const handleNewAppointment = (time) => {
@@ -145,12 +141,12 @@ const TodaySchedule = () => {
     };
 
     const handleAppointmentClick = (appointment) => {
-        if (appointment.status === 'libre') {
+        if (appointment.isFreeSlot) {
             handleNewAppointment(appointment.time);
         } else {
             toast({
-                title: `📅 Cita de ${appointment.client}`,
-                description: `${appointment.service} a las ${appointment.time}`,
+                title: `Cita de ${appointment.clientName}`,
+                description: `${appointment.serviceName} a las ${appointment.time}`,
             });
         }
     };
@@ -230,7 +226,7 @@ const TodaySchedule = () => {
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.3, delay: index * 0.05 }}
                         >
-                            {appointment.status === 'libre' ? (
+                            {appointment.isFreeSlot ? (
                                 <Button
                                     variant="ghost"
                                     className="w-full h-auto p-4 flex items-center justify-between rounded-xl transition-all duration-300 border border-dashed border-border/50 hover:bg-accent hover:border-primary/50"
@@ -252,7 +248,7 @@ const TodaySchedule = () => {
                                 </Button>
                             ) : (
                                 <div
-                                    className="flex items-center justify-between p-3 sm:p-4 rounded-xl cursor-pointer transition-all duration-300 border bg-card hover:bg-accent"
+                                    className={`flex items-center justify-between p-3 sm:p-4 rounded-xl cursor-pointer transition-all duration-300 border bg-card hover:bg-accent ${appointment.status === 'CANCELLED' ? 'opacity-50' : ''}`}
                                     onClick={() => handleAppointmentClick(appointment)}
                                     role="button"
                                     tabIndex={0}
@@ -266,49 +262,46 @@ const TodaySchedule = () => {
                                         </div>
                                         <div className="w-px h-10 bg-border/70 hidden sm:block"></div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="font-bold text-card-foreground tracking-tight text-base sm:text-lg truncate" title={appointment.client}>
-                                                {appointment.client}
+                                            <h4 className="font-bold text-card-foreground tracking-tight text-base sm:text-lg truncate" title={appointment.clientName}>
+                                                {appointment.clientName}
                                             </h4>
-                                            <p className="text-muted-foreground text-sm sm:text-base truncate" title={appointment.service}>
-                                                {appointment.service}
+                                            <p className="text-muted-foreground text-sm sm:text-base truncate" title={appointment.serviceName}>
+                                                {appointment.serviceName}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center space-x-2 sm:space-x-4 ml-2">
-                                        {/* --- NUEVO: Renderizado del botón de recordatorio --- */}
-                                        {appointment.reminder_sent ? (
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <div className="flex items-center justify-center w-8 h-8">
-                                                        <CheckCircle className="w-5 h-5 text-success" />
-                                                    </div>
-                                                </TooltipTrigger>
-                                                <TooltipContent><p>Recordatorio enviado</p></TooltipContent>
-                                            </Tooltip>
-                                        ) : (
+                                    <div className="flex items-center space-x-2 sm:space-x-3 ml-2">
+                                        {/* Botón de enviar recordatorio - solo si está SCHEDULED y es futuro */}
+                                        {canSendReminder(appointment) && (
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Button variant="ghost" size="icon"
                                                         onClick={(e) => { e.stopPropagation(); handleSendReminder(appointment); }}
-                                                        className="text-warning hover:text-yellow-700 hover:bg-yellow-100/50 h-8 w-8"
-                                                        aria-label="Enviar recordatorio"
+                                                        className="text-green-600 hover:text-green-700 hover:bg-green-100/50 h-8 w-8"
+                                                        disabled={sendingReminder === appointment.id}
+                                                        aria-label="Enviar recordatorio por WhatsApp"
                                                     >
-                                                        <MessageSquare className="w-5 h-5" />
+                                                        {sendingReminder === appointment.id
+                                                            ? <Loader2 className="w-5 h-5 animate-spin" />
+                                                            : <Send className="w-5 h-5" />
+                                                        }
                                                     </Button>
                                                 </TooltipTrigger>
-                                                <TooltipContent><p>Enviar recordatorio de cita</p></TooltipContent>
+                                                <TooltipContent><p>Enviar recordatorio por WhatsApp</p></TooltipContent>
                                             </Tooltip>
                                         )}
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <div className="w-6 h-6 flex items-center justify-center">
-                                                    {getStatusIcon(appointment.status)}
-                                                </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p className="capitalize">{appointment.status.replace('_', ' ')}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
+                                        {/* Badge de estado */}
+                                        {statusConfig[appointment.status] && (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full border ${statusConfig[appointment.status].className}`}>
+                                                        {React.createElement(statusConfig[appointment.status].icon, { className: 'w-3.5 h-3.5' })}
+                                                        <span className="hidden sm:inline">{statusConfig[appointment.status].label}</span>
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent><p>{statusConfig[appointment.status].label}</p></TooltipContent>
+                                            </Tooltip>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -316,7 +309,22 @@ const TodaySchedule = () => {
                     ))}
                 </div>
 
-                <div className="mt-6 pt-6 border-t">
+                <div className="mt-6 pt-4 border-t space-y-3">
+                    {/* Resumen de estados */}
+                    <div className="flex items-center justify-center gap-4 text-xs sm:text-sm flex-wrap">
+                        <div className="flex items-center gap-1 text-green-600">
+                            <CheckCircle className="w-4 h-4" />
+                            <span>{appointments.filter(a => a.status === 'CONFIRMED').length} confirmados</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-blue-600">
+                            <MessageSquare className="w-4 h-4" />
+                            <span>{appointments.filter(a => a.status === 'REMINDER_SENT').length} esperando</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-yellow-600">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>{appointments.filter(a => a.status === 'SCHEDULED').length} sin recordatorio</span>
+                        </div>
+                    </div>
                     <div className="flex justify-center items-center p-3 rounded-lg bg-accent/50">
                         <div className="flex items-center space-x-2 text-primary">
                             <Banknote className="w-5 h-5" />

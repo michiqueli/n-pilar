@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, addMonths, subMonths, startOfMonth, endOfMonth, isToday, isSameDay, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Edit, Coffee, X, Trash2, Moon, XCircle } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Edit, Coffee, X, Trash2, Moon, XCircle, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -103,6 +103,48 @@ const Calendario = () => {
     const [preselectedClient, setPreselectedClient] = useState(null);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [appointmentToDelete, setAppointmentToDelete] = useState(null);
+    const [sendingReminder, setSendingReminder] = useState(null);
+
+    // Mapa de estados de turno para mostrar badges
+    const statusConfig = {
+        SCHEDULED: { label: 'Pendiente', className: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' },
+        REMINDER_SENT: { label: 'Recordatorio enviado', className: 'bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+        CONFIRMED: { label: 'Confirmado', className: 'bg-green-500/20 text-green-700 dark:text-green-400' },
+        COMPLETED: { label: 'Completado', className: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
+        PAID: { label: 'Pagado', className: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
+        CANCELLED: { label: 'Cancelado', className: 'bg-red-500/20 text-red-700 dark:text-red-400' },
+    };
+
+    // Enviar recordatorio por WhatsApp
+    const handleSendReminder = async (e, appointment) => {
+        e.stopPropagation();
+        if (sendingReminder) return;
+        setSendingReminder(appointment.id);
+        try {
+            await api.sendAppointmentReminder(appointment.id);
+            setAppointments(prev => prev.map(a =>
+                a.id === appointment.id ? { ...a, status: 'REMINDER_SENT' } : a
+            ));
+            toast({
+                title: 'Recordatorio enviado ✅',
+                description: `Se envió el recordatorio por WhatsApp a ${appointment.client?.name || appointment.clients?.name}.`,
+            });
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Error al enviar recordatorio',
+                description: error.message,
+            });
+        } finally {
+            setSendingReminder(null);
+        }
+    };
+
+    // Determina si se puede enviar recordatorio (solo turnos SCHEDULED futuros)
+    const canSendReminder = (appointment) => {
+        return appointment.status === 'SCHEDULED' &&
+            new Date(appointment.appointment_at) > new Date();
+    };
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -595,7 +637,10 @@ const Calendario = () => {
                                 <MobileDayView
                                     day={currentDate}
                                     appointments={appointments.filter(a => isSameDay(parseISO(a.appointment_at), currentDate))}
-                                    onAppointmentAction={(action, appt) => handleDeleteAppointment(appt)}
+                                    onAppointmentAction={(action, appt) => {
+                                        if (action === 'reminder') handleSendReminder({ stopPropagation: () => {} }, appt);
+                                        else if (action === 'cancel') handleDeleteAppointment(appt);
+                                    }}
                                     onNewAppointment={handleOpenModal}
                                     isSlotAvailable={(day, hourIndex) => getSlotStatus(day, hourIndex) === 'available'}
                                 />
@@ -667,7 +712,16 @@ const Calendario = () => {
                                             return (
                                                 <div
                                                     key={appointment.id}
-                                                    className="bg-primary/20 p-2 rounded-lg flex flex-col justify-between overflow-hidden border-l-4 border-primary cursor-pointer hover:bg-primary/30 transition-colors group relative"
+                                                    className={cn(
+                                                        "p-2 rounded-lg flex flex-col justify-between overflow-hidden border-l-4 cursor-pointer hover:bg-primary/30 transition-colors group relative",
+                                                        appointment.status === 'CANCELLED'
+                                                            ? "bg-red-500/10 border-red-400 opacity-60"
+                                                            : appointment.status === 'CONFIRMED'
+                                                            ? "bg-green-500/10 border-green-500"
+                                                            : appointment.status === 'REMINDER_SENT'
+                                                            ? "bg-blue-500/10 border-blue-400"
+                                                            : "bg-primary/20 border-primary"
+                                                    )}
                                                     style={{
                                                         gridColumn: `${dayIndex + 2} / span 1`,
                                                         gridRow: `${appointment.hourIndex + 2} / span ${appointment.durationInSlots}`,
@@ -678,19 +732,45 @@ const Calendario = () => {
                                                     <div className="flex-grow">
                                                         <p className="font-bold text-primary text-sm truncate">{appointment.clients?.name || appointment.client?.name}</p>
                                                         <p className="text-primary/80 text-xs truncate">{appointment.services?.name || appointment.service?.name}</p>
+                                                        {statusConfig[appointment.status] && (
+                                                            <span className={cn("inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5", statusConfig[appointment.status].className)}>
+                                                                {statusConfig[appointment.status].label}
+                                                            </span>
+                                                        )}
                                                     </div>
 
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="absolute top-1 right-1 h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDeleteAppointment(appointment);
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    <div className="absolute top-1 right-1 flex gap-0.5">
+                                                        {canSendReminder(appointment) && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                                                        disabled={sendingReminder === appointment.id}
+                                                                        onClick={(e) => handleSendReminder(e, appointment)}
+                                                                    >
+                                                                        {sendingReminder === appointment.id
+                                                                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                            : <Send className="h-3.5 w-3.5" />
+                                                                        }
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent><p>Enviar recordatorio por WhatsApp</p></TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6 text-destructive"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteAppointment(appointment);
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             );
                                         })}

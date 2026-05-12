@@ -115,6 +115,14 @@ class ApiClient {
     return this.request(`/clients/${id}`, { method: 'DELETE' });
   }
 
+  deactivateClient(id) {
+    return this.request(`/clients/${id}/deactivate`, { method: 'PUT' });
+  }
+
+  activateClient(id) {
+    return this.request(`/clients/${id}/activate`, { method: 'PUT' });
+  }
+
   // Services
   getServices(category) {
     const params = category ? `?category=${encodeURIComponent(category)}` : '';
@@ -203,6 +211,10 @@ class ApiClient {
 
   deleteAppointment(id) {
     return this.request(`/appointments/${id}`, { method: 'DELETE' });
+  }
+
+  sendAppointmentReminder(id) {
+    return this.request(`/appointments/${id}/reminder`, { method: 'POST' });
   }
 
   // Payments

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Phone, Mail, Star, Eye, Edit, Calendar, Trash2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Phone, Mail, Star, Eye, Edit, Calendar, Trash2, ShieldCheck, ShieldAlert, UserX, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -8,13 +8,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
-const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointment, onDelete, onSendConsent, viewMode }) => {
+const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointment, onDelete, onDeactivate, onActivate, onSendConsent, viewMode }) => {
   const getClientAvatar = (name) => {
     const initials = name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     const colors = [
@@ -32,7 +33,7 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
   };
 
   const getLastVisitText = (lastVisit) => {
-    if (!lastVisit) return 'Primera visita';
+    if (!lastVisit) return 'Sin visitas';
     try {
       return formatDistanceToNow(new Date(lastVisit), { addSuffix: true, locale: es });
     } catch {
@@ -41,13 +42,15 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
   };
 
   const getClientType = (client) => {
-    if (!client.lastVisit) return 'new';
-    if (client.visits >= 10) return 'frequent';
-    if (new Date() - new Date(client.lastVisit) > 30 * 24 * 60 * 60 * 1000) return 'inactive';
+    if (client.active === false) return 'inactive';
+    if (!client.last_visit_at) return 'new';
+    if ((client.total_visits || 0) >= 10) return 'frequent';
+    if (new Date() - new Date(client.last_visit_at) > 90 * 24 * 60 * 60 * 1000) return 'dormant';
     return 'regular';
   };
 
   const isNewClient = (createdAt) => {
+    if (!createdAt) return false;
     const daysSinceCreated = (new Date() - new Date(createdAt)) / (1000 * 60 * 60 * 24);
     return daysSinceCreated <= 7;
   };
@@ -57,6 +60,8 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
       case 'frequent':
         return 'border-l-4 border-l-success bg-success/5';
       case 'inactive':
+        return 'border-l-4 border-l-red-400 bg-red-500/5 opacity-60';
+      case 'dormant':
         return 'border-l-4 border-l-muted-foreground bg-muted/20';
       case 'new':
         return 'border-l-4 border-l-blue-400 bg-blue-400/5';
@@ -88,7 +93,7 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
             <div className="flex-1 overflow-hidden">
                 <h3 className="font-bold text-foreground truncate">{client?.name}</h3>
                 <p className="text-muted-foreground text-sm truncate">{client?.phone}</p>
-                 <p className="text-muted-foreground text-xs truncate">{getLastVisitText(client.lastVisit)}</p>
+                 <p className="text-muted-foreground text-xs truncate">{getLastVisitText(client.last_visit_at)}</p>
             </div>
             <Button size="lg" variant="primary" className="h-12 w-auto" onClick={(e) => { e.stopPropagation(); onScheduleAppointment(client); }}>
                 <Calendar className="w-4 h-4" />
@@ -111,8 +116,13 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
       transition={{ duration: 0.3, delay: index * 0.05 }}
       whileHover={{ y: -4, boxShadow: "0 10px 25px -5px hsl(var(--primary) / 0.1), 0 8px 10px -6px hsl(var(--primary) / 0.1)" }}
     >
-      {isNewClient(client.createdAt) && !isCompact && (
-        <div className="absolute top-3 right-3 bg-blue-500/20 text-blue-400 text-xs px-2 py-1 rounded-full border border-blue-400/30 font-semibold">
+      {client.active === false && !isCompact && (
+        <div className="absolute top-3 right-12 bg-red-500/20 text-red-500 text-xs px-2 py-1 rounded-full border border-red-500/30 font-semibold">
+          DESACTIVADO
+        </div>
+      )}
+      {isNewClient(client.created_at) && client.active !== false && !isCompact && (
+        <div className="absolute top-3 right-12 bg-blue-500/20 text-blue-400 text-xs px-2 py-1 rounded-full border border-blue-400/30 font-semibold">
           NUEVO
         </div>
       )}
@@ -151,17 +161,31 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
               <DropdownMenuItem onClick={() => onEdit(client)}>
                 <Edit className="w-4 h-4 mr-2" /> Editar Cliente
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onScheduleAppointment(client)}>
-                <Calendar className="w-4 h-4 mr-2" /> Agendar Cita
-              </DropdownMenuItem>
-              {!client.consent_status === 'accepted' && client.email && onSendConsent && (
+              {client.active !== false && (
+                <DropdownMenuItem onClick={() => onScheduleAppointment(client)}>
+                  <Calendar className="w-4 h-4 mr-2" /> Agendar Cita
+                </DropdownMenuItem>
+              )}
+              {client.consent_status !== 'accepted' && client.email && onSendConsent && (
                 <DropdownMenuItem onClick={() => onSendConsent(client)}>
                   <ShieldAlert className="w-4 h-4 mr-2" /> Enviar Consentimiento
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => onDelete(client.id)} className="text-destructive">
-                <Trash2 className="w-4 h-4 mr-2" /> Eliminar
-              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {client.active === false ? (
+                <>
+                  <DropdownMenuItem onClick={() => onActivate && onActivate(client.id)}>
+                    <UserCheck className="w-4 h-4 mr-2 text-green-600" /> Reactivar Cliente
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDelete(client.id)} className="text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" /> Eliminar Definitivamente
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem onClick={() => onDeactivate && onDeactivate(client.id)} className="text-orange-600">
+                  <UserX className="w-4 h-4 mr-2" /> Desactivar Cliente
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
       </div>
@@ -183,7 +207,7 @@ const ClientCard = ({ client, index, onViewProfile, onEdit, onScheduleAppointmen
 
             <div className="flex items-center text-muted-foreground">
               <Calendar className="w-4 h-4 mr-3 text-primary" />
-              <span>Fecha última visita: {client.lastVisit ? format(new Date(client.lastVisit), 'dd/MM/yyyy') : 'Nunca'}</span>
+              <span>Fecha última visita: {client.last_visit_at ? format(new Date(client.last_visit_at), 'dd/MM/yyyy') : 'Nunca'}</span>
             </div>
 
             <div className="flex items-center text-muted-foreground">

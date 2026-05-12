@@ -30,22 +30,23 @@ const DailyStatusLine = () => {
 
     const dailyStats = useMemo(() => {
         const now = new Date();
-        
-        const upcomingAppointments = todaysAppointments.filter(
-            a => parseISO(a.appointment_at) > now && a.status !== 'CANCELLED'
-        );
-        
-        const cancellations = todaysAppointments.filter(
-            a => a.status === 'CANCELLED'
-        ).length;
+
+        const active = todaysAppointments.filter(a => a.status !== 'CANCELLED');
+        const upcomingAppointments = active.filter(a => parseISO(a.appointment_at) > now);
+
+        const cancellations = todaysAppointments.filter(a => a.status === 'CANCELLED').length;
+        const confirmed = todaysAppointments.filter(a => a.status === 'CONFIRMED').length;
+        const pendingReminder = todaysAppointments.filter(a => a.status === 'SCHEDULED').length;
 
         const nextAppointment = upcomingAppointments[0];
-        
+
         return {
-            nextClientName: nextAppointment?.clients?.name || null,
+            nextClientName: nextAppointment?.client?.name || nextAppointment?.clients?.name || null,
             nextClientTime: nextAppointment ? format(parseISO(nextAppointment.appointment_at), 'HH:mm') : null,
-            totalAppointments: todaysAppointments.filter(a => a.status !== 'CANCELLED').length,
-            cancellations: cancellations,
+            totalAppointments: active.length,
+            cancellations,
+            confirmed,
+            pendingReminder,
         };
     }, [todaysAppointments]);
 
@@ -60,9 +61,11 @@ const DailyStatusLine = () => {
     // Lógica para elegir qué mensaje mostrar
     let statusMessage;
     if (dailyStats.cancellations > 0) {
-        statusMessage = `Ojo: Tienes ${dailyStats.cancellations} cancelación para hoy.`;
+        statusMessage = `Ojo: Tienes ${dailyStats.cancellations} cancelación(es) para hoy.`;
     } else if (dailyStats.nextClientName) {
-        statusMessage = `Tu próximo cliente es ${dailyStats.nextClientName} a las ${dailyStats.nextClientTime}hs. Hoy tienes ${dailyStats.totalAppointments} turnos.`;
+        const confirmInfo = dailyStats.confirmed > 0 ? ` (${dailyStats.confirmed} confirmados)` : '';
+        const pendingInfo = dailyStats.pendingReminder > 0 ? ` — ${dailyStats.pendingReminder} sin confirmar` : '';
+        statusMessage = `Próximo: ${dailyStats.nextClientName} a las ${dailyStats.nextClientTime}hs. ${dailyStats.totalAppointments} turnos hoy${confirmInfo}${pendingInfo}.`;
     } else if (dailyStats.totalAppointments > 0) {
         statusMessage = `¡Buen trabajo! Ya completaste los ${dailyStats.totalAppointments} turnos de hoy.`;
     } else {

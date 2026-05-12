@@ -172,6 +172,26 @@ const Clientes = () => {
         }
     };
 
+    const handleDeactivate = async (clientId) => {
+        try {
+            await api.deactivateClient(clientId);
+            setClients(prev => prev.map(c => c.id === clientId ? { ...c, active: false } : c));
+            toast({ title: 'Cliente desactivado', description: 'El cliente fue desactivado. Podés reactivarlo o eliminarlo definitivamente.' });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message });
+        }
+    };
+
+    const handleActivate = async (clientId) => {
+        try {
+            await api.activateClient(clientId);
+            setClients(prev => prev.map(c => c.id === clientId ? { ...c, active: true } : c));
+            toast({ title: 'Cliente reactivado', description: 'El cliente fue reactivado correctamente.' });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message });
+        }
+    };
+
     const handleFeatureNotImplemented = (featureName) => {
         toast({
             title: `🚧 ${featureName} no disponible`,
@@ -199,19 +219,39 @@ const Clientes = () => {
 
     const filteredAndSortedClients = clients
         .filter(client => {
+            // Filtro por búsqueda de texto
             const searchLower = searchTerm.toLowerCase();
-            return client?.name.toLowerCase().includes(searchLower) ||
-                   client?.phone.includes(searchTerm) ||
+            const matchesSearch = client?.name?.toLowerCase().includes(searchLower) ||
+                   client?.phone?.includes(searchTerm) ||
                    (client.email && client.email.toLowerCase().includes(searchLower));
+            if (!matchesSearch) return false;
+
+            // Filtro por categoría
+            if (filterBy === 'all') return true;
+            if (filterBy === 'active') return client.active !== false;
+            if (filterBy === 'inactive') return client.active === false;
+            // Los filtros de actividad solo aplican a clientes activos
+            if (client.active === false) return false;
+            const visits = client.total_visits || 0;
+            if (filterBy === 'frequent') return visits >= 10;
+            if (filterBy === 'regular') return visits >= 3 && visits < 10;
+            if (filterBy === 'dormant') {
+                return !client.last_visit_at || (new Date() - new Date(client.last_visit_at)) > 90 * 24 * 60 * 60 * 1000;
+            }
+            return true;
         })
         .sort((a, b) => {
             switch (sortBy) {
                 case 'name':
                     return a.name.localeCompare(b.name);
+                case 'lastVisit':
                 case 'last_visit_at':
                     return new Date(b.last_visit_at || 0) - new Date(a.last_visit_at || 0);
+                case 'oldestVisit':
+                    return new Date(a.last_visit_at || 0) - new Date(b.last_visit_at || 0);
                 case 'created_at':
                     return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                case 'totalSpent':
                 case 'total_visits':
                     return (b.total_visits || 0) - (a.total_visits || 0);
                 default:
@@ -327,6 +367,8 @@ const Clientes = () => {
                                 onEdit={handleEdit}
                                 onScheduleAppointment={handleScheduleAppointment}
                                 onDelete={handleDelete}
+                                onDeactivate={handleDeactivate}
+                                onActivate={handleActivate}
                                 onSendConsent={handleSendConsent}
                             />
                         })}

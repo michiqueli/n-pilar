@@ -28,9 +28,11 @@ const ClientFilters = ({
 
   const filterOptions = [
     { key: 'all', label: 'Todos', color: 'bg-muted', textColor: 'text-muted-foreground' },
+    { key: 'active', label: 'Activos', color: 'bg-primary/20', textColor: 'text-primary' },
     { key: 'frequent', label: 'Frecuentes', color: 'bg-green-500/20', textColor: 'text-green-500' },
     { key: 'regular', label: 'Regulares', color: 'bg-blue-500/20', textColor: 'text-blue-500' },
-    { key: 'inactive', label: 'Inactivos', color: 'bg-red-500/20', textColor: 'text-red-500' }
+    { key: 'dormant', label: 'Sin actividad', color: 'bg-yellow-500/20', textColor: 'text-yellow-500' },
+    { key: 'inactive', label: 'Desactivados', color: 'bg-red-500/20', textColor: 'text-red-500' }
   ];
 
   const sortOptions = [
@@ -44,12 +46,16 @@ const ClientFilters = ({
     switch (filter) {
       case 'all':
         return clients.length;
+      case 'active':
+        return clients.filter(c => c.active !== false).length;
       case 'frequent':
-        return clients.filter(c => c.visits >= 10).length;
+        return clients.filter(c => c.active !== false && (c.total_visits || 0) >= 10).length;
       case 'regular':
-        return clients.filter(c => c.visits >= 3 && c.visits < 10).length;
+        return clients.filter(c => c.active !== false && (c.total_visits || 0) >= 3 && (c.total_visits || 0) < 10).length;
+      case 'dormant':
+        return clients.filter(c => c.active !== false && (!c.last_visit_at || (new Date() - new Date(c.last_visit_at)) > 90 * 24 * 60 * 60 * 1000)).length;
       case 'inactive':
-        return clients.filter(c => !c.lastVisit || new Date() - new Date(c.lastVisit) > 90 * 24 * 60 * 60 * 1000).length;
+        return clients.filter(c => c.active === false).length;
       default:
         return 0;
     }
